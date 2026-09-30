@@ -130,7 +130,7 @@ export function desktopDshPackageSpec(packageSet: DesktopCorePackageSet): string
  */
 export function verifyDesktopCorePackageSet(
   projectDir: string,
-  expectedReleaseVersion: string,
+  expectedReleaseVersion?: string,
 ): DesktopCorePackageSet {
   const packageSet = readDesktopCorePackageSet(projectDir, expectedReleaseVersion)
   const packageDir = join(projectDir, DESKTOP_PACKAGES_DIR)

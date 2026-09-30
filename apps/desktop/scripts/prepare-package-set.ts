@@ -88,7 +88,10 @@ export function selectDesktopPackageClosure(
 }
 
 function packedManifest(tarball: string): Record<string, unknown> {
-  const value: unknown = JSON.parse(capture('tar', ['-xOzf', tarball, 'package/package.json']))
+  // --force-local: on Windows the drive colon (D:\…) otherwise reads as a
+  // remote host by GNU tar ("Cannot connect to D"), which Git Bash places
+  // ahead of the system bsdtar on PATH.
+  const value: unknown = JSON.parse(capture('tar', ['--force-local', '-xOzf', tarball, 'package/package.json']))
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new Error(`desktop package set: ${tarball} has no package manifest`)
   }

@@ -305,6 +305,11 @@
     - id: chengzi-experts
       name: 'dsh-plugin-chengzi-experts'
 
+    # Chengzi PRO brand: orange-slice sidebar/hero brand occupants; client
+    # plane of dsh-plugin-chengzi-brand.
+    - id: chengzi-brand
+      name: 'dsh-plugin-chengzi-brand'
+
     # Read-only Plugin list tab in the Settings Plugins section; the built-in
     # bundles the sidebar page leaves out are inspected here.
     - id: ui-settings-plugin-inventory

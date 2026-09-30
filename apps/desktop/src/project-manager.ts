@@ -131,9 +131,12 @@ export class DesktopProjectManager {
 }
 
 /** Create build-only project metadata for materializing the signed runtime. */
-export function createRuntimeProjectMetadata(projectDir: string, release: DesktopRelease): void {
+export function createRuntimeProjectMetadata(projectDir: string, _release: DesktopRelease): void {
   mkdirSync(projectDir, { recursive: true, mode: 0o700 })
-  const packageSet = verifyDesktopCorePackageSet(projectDir, release.version)
+  // Chengzi fork: the shell carries its own product version line while the
+  // vendored runtime keeps the upstream one, so verify without pinning the
+  // shell version onto the runtime package set.
+  const packageSet = verifyDesktopCorePackageSet(projectDir)
   const manifest = {
     name: PROJECT_NAME,
     private: true,

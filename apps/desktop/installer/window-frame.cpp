@@ -7,6 +7,15 @@
 #include <objidl.h>
 #include <commctrl.h>
 #include <dwmapi.h>
+// Chengzi fork build environment: the older Windows SDK paired with the local
+// VS2019 Build Tools expects the Win32 min/max macros inside GdiplusTypes.h,
+// which NOMINMAX above removes; reintroduce them as inline functions before
+// the Gdiplus headers pull them in.
+namespace chengzi_minmax_shim {
+  template <typename T> inline T min(T a, T b) { return a < b ? a : b; }
+  template <typename T> inline T max(T a, T b) { return a > b ? a : b; }
+}
+using namespace chengzi_minmax_shim;
 #include <gdiplus.h>
 #include <new>
 #include <algorithm>

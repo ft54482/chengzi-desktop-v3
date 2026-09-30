@@ -61,18 +61,18 @@ it('boots the built plugin graph and renders a fixture session end to end', asyn
 
   // The sidebar renders from the boot graph: every inject layer activated.
   const tree = await screen.findByRole('tree', { name: 'Sessions' }, { timeout: 10_000 })
-  if (clientBuildValue('DSH_CLIENT_BUILD_PROFILE') === 'official') {
-    expect(document.querySelector('svg[viewBox="26 0 156 24"]')).not.toBeNull()
-    expect(screen.queryByText('DSH Local Build')).toBeNull()
-  } else {
-    expect(document.querySelector('svg[viewBox="0 0 23.16 17.04"]')).not.toBeNull()
-    const version = clientBuildValue('DSH_CLIENT_VERSION')
-    if (version === undefined) throw new Error('default client build record must carry DSH_CLIENT_VERSION')
+  // 橙子PRO brand occupant (chengzi-brand, shadowing rank -1) wins the brand
+  // cells in both build profiles: the orange slice replaces the whale
+  // wordmark/fish fallback and the product name replaces the local-build name.
+  expect(document.querySelector('svg[viewBox="0 0 24 24"] circle[fill="#E8732A"]')).not.toBeNull()
+  expect(screen.queryByText('DSH Local Build')).toBeNull()
+  screen.getByText('橙子PRO')
+  const version = clientBuildValue('DSH_CLIENT_VERSION')
+  if (version !== undefined) {
     const commit = clientBuildValue('DSH_CLIENT_COMMIT_HASH')
     const buildVersion = version
       + (commit === undefined ? '' : `-${commit}`)
       + (clientBuildValue('DSH_CLIENT_GIT_DIRTY') === 'true' ? '-dirty' : '')
-    screen.getByText('DSH Local Build')
     screen.getByText(buildVersion)
   }
   // The compact layout dropped group session counts; the fixture workspace

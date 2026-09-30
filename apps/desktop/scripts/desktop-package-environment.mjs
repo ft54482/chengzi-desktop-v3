@@ -82,8 +82,11 @@ export function validateDesktopPackageEnvironment(environment, target, options =
   resolveDesktopPolicyEnvironment(environment)
   if (target.platform === 'darwin') resolveMacOSPackageSettings(environment)
   else resolveWindowsPackageSettings(environment)
-  if (options.unsigned) return
+  // 橙子PRO：unsigned 构建同样校验更新部署配置（自建平台 sha512-only 更新链的
+  // 前提，与 electron-builder-config 的 unsigned 门放行配套）；只有签名要求继续
+  // 被 unsigned 跳过。prepare-only 仍不触及更新配置（准备阶段不发布，同上游）。
   if (!options.prepareOnly) resolveDesktopAutoUpdateConfig(environment, target.platform, target.arch)
+  if (options.unsigned) return
   if (target.platform === 'win32') {
     if (!options.prepareOnly) createWindowsTokenSigner({
       certificateFile: environment.DSH_DESKTOP_WINDOWS_CER_FILE,

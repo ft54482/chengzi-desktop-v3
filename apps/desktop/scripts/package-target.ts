@@ -469,7 +469,32 @@ export async function packageTarget(
   ], buildEnv, REPOSITORY_ROOT)
   await execute(['run', 'prepare:runtime', ...(signPrimaryRuntime ? ['--defer-primary-runtime-smoke'] : [])], downloadEnv)
   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime'], electronBuilderEnv)
-  await execute(['run', 'prepare:packages'], targetEnv)
+  // Chengzi side channel: the official dsh release family only packs
+  // @deepseek-ai packages sharing the family version, so the branded plugin
+  // packs are packed here into their own input directory and joined into the
+  // closure via --from alongside the three default inputs.
+  rmSync(buildPaths.packedChengzi, { recursive: true, force: true })
+  mkdirSync(buildPaths.packedChengzi, { recursive: true })
+  for (const chengziPackage of ['account', 'brand', 'experts', 'image']) {
+    await execute([
+      '--dir',
+      join(REPOSITORY_ROOT, 'packages', 'chengzi', chengziPackage),
+      'pack',
+      '--pack-destination',
+      buildPaths.packedChengzi,
+    ], buildEnv, REPOSITORY_ROOT)
+  }
+  await execute([
+    '--dir',
+    APP_ROOT,
+    'exec',
+    'tsx',
+    'scripts/prepare-package-set.ts',
+    '--from', buildPaths.packedDsh,
+    '--from', buildPaths.packedVendor,
+    '--from', buildPaths.packedLandlock,
+    '--from', buildPaths.packedChengzi,
+  ], targetEnv, REPOSITORY_ROOT)
   await execute(['run', 'prepare:dsh', ...(signPrimaryRuntime ? ['--defer-runtime-smoke'] : [])], downloadEnv)
   if (signPrimaryRuntime) await execute(['run', 'sign:primary-runtime', '--dsh'], electronBuilderEnv)
   if (invocation.prepareOnly) return

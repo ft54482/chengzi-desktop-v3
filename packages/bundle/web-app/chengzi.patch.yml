@@ -24,3 +24,47 @@
     # cordis.patch.yml 浏览器 roster 的 chengzi-experts 行）。
     - id: chengzi-experts
       name: 'dsh-plugin-chengzi-experts'
+
+# ── 橙子PRO v3：平台生态锁定与默认模型兜底（H 追加层） ────────────────────────
+# 以下为按 id 覆盖/预置的顶层 patch 条目（loader 语义：后层覆盖先层、整组
+# config 替换、禁用行不带 config）。本文件禁止 js 表达式标签（!! 双感叹号
+# +js 的 YAML tag）——部署版打包时无法求值，v2 旧教训。
+
+# v1 红线（锁定平台生态）：禁用基座官方 DeepSeek 对话路由两条——
+# `deepseek-official`（API key 适配器，DEEPSEEK_API_KEY）与 `deepseek-account`
+# （官方账号 token 适配器）。对话模型只由 chengzi-account 目录同步注入的
+# llm-pi-ai「chengzi-platform*」分组路由供给。base 的 `deepseek-account`
+# 账号基建行（dsh-deepseek-account-platform）不动：桌面壳层账号栈仍依赖。
+- id: llm-deepseek
+  disabled: true
+
+- id: llm-deepseek-account
+  disabled: true
+
+# 默认会话模型兜底初值（首装/目录同步前生效；此后由 chengzi-account 的
+# provider-sync 维护 settings `agent-default-model` 命名空间动态接管）。
+# provider 必须用 provider-sync 的分组路由名：默认/vip 组 =
+# CHENGZI_PROVIDER_ROUTE「chengzi-platform」（多组路由为
+# chengzi-platform-<组slug>，见 packages/chengzi/account/src/provider-sync.ts
+# 的 chengziGroupProviderRoute）；model = 运营钦定的 deepseek-v4.1-flash
+# （2026-09-23 拍板：默认别用 free 打底）。整组 config 替换，两个键都要写全。
+- id: agent-default-model
+  config:
+    provider: chengzi-platform
+    model: deepseek-v4.1-flash
+
+# P4 预置（暂注释）：Nuphus MCP 桌面自动化（截屏/窗口/鼠标/键盘 mcp__ 工具）。
+# stdio 连接全局 npm 包 @nuphus/nuphus-mcp（0.2 的 @deepseek-ai/dsh-mcp-client
+# 仍在：packages/mcp/mcp-client，stdio schema 为 transport/serverName/command/
+# args[+env/cwd/toolCallTimeoutMs/failOnStartupError]，与 v2 同形）。激活时：
+# ① 取消本行注释；② 在本包 package.json dependencies 增加
+# "@deepseek-ai/dsh-mcp-client": "workspace:*"（bundle 注入两行式纪律）；
+# ③ 目标机器装全局 nuphus-mcp。failOnStartupError 默认 false：未装时仅该组
+# 工具不可用（自动重连），不影响 harness 启动。
+# - id: mcp-nuphus
+#   name: '@deepseek-ai/dsh-mcp-client'
+#   config:
+#     serverName: nuphus-mcp
+#     transport: stdio
+#     command: nuphus-mcp
+#     args: []

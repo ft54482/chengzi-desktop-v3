@@ -2,7 +2,6 @@
   "name": "dsh-plugin-chengzi-experts",
   "description": "Chengzi Pro experts: cloud/builtin expert catalog materialized as agent presets, the gallery panel and start-with-expert flow, cloud skill packages, and the mine (user-built) experts store with cloud backup",
   "version": "3.0.0",
-  "private": true,
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

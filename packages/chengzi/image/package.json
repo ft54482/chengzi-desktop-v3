@@ -2,7 +2,6 @@
   "name": "dsh-plugin-chengzi-image",
   "description": "Chengzi Pro generate_image agent tool: per-call platform image generation billed to the signed-in account, with a built-in cost/resolution confirmation card",
   "version": "3.0.0",
-  "private": true,
   "type": "module",
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",

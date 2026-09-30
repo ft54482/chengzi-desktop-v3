@@ -51,6 +51,9 @@ export interface DesktopElectronBuilderConfig {
     readonly allowElevation: false
     readonly allowToChangeInstallationDirectory: false
     readonly installerLanguages: readonly ['en_US', 'zh_CN']
+    /** Chengzi brand: installer artifact base name (Setup.exe) and Start-menu shortcut name. */
+    readonly artifactName?: string
+    readonly shortcutName?: string
   }
   readonly beforeBuild: () => Promise<boolean>
   readonly beforePack: (context: BeforePackContext) => Promise<void>

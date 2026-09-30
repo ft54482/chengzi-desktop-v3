@@ -51,10 +51,14 @@ function manifestVersion(path: string, subject: string): string {
 }
 
 function desktopRelease(): DesktopRelease {
-  const version = manifestVersion(join(APP_ROOT, 'package.json'), 'desktop package')
-  const dshVersion = manifestVersion(resolve(APP_ROOT, '..', '..', 'package.json'), 'root dsh package')
-  if (version !== dshVersion) {
-    throw new Error(`desktop runtime: Electron ${version} must bind the same version of @deepseek-ai/dsh, found ${dshVersion}`)
+  // Chengzi fork: the Desktop release record describes the vendored runtime,
+  // so it carries the upstream @deepseek-ai/dsh version while the branded
+  // shell keeps its own product version (ChengziPRO 3.x) in package.json for
+  // electron-builder and the update feed.
+  const shellVersion = manifestVersion(join(APP_ROOT, 'package.json'), 'desktop package')
+  const version = manifestVersion(resolve(APP_ROOT, '..', '..', 'package.json'), 'root dsh package')
+  if (version !== shellVersion) {
+    console.warn(`desktop runtime: ChengziPRO ${shellVersion} binds upstream dsh ${version}`)
   }
   const runtime = JSON.parse(readFileSync(join(RUNTIME_ROOT, 'versions.json'), 'utf8')) as Record<string, unknown>
   return parseDesktopRelease({
@@ -125,10 +129,10 @@ async function main(): Promise<void> {
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:lockfile', () => runPnpm(['install', '--lockfile-only']))
     verifyDesktopCoreLockfile(
       readFileSync(join(BUILD_ROOT, 'pnpm-lock.yaml'), 'utf8'),
-      readDesktopCorePackageSet(BUILD_ROOT, release.version),
+      readDesktopCorePackageSet(BUILD_ROOT), // Chengzi fork: runtime keeps the upstream version line; the shell version is asserted at the Desktop release level instead
     )
     await packagingStep(process.env.DSH_DESKTOP_PACKAGING_RUN_DIR, 'runtime:install', () => runPnpm(['install', '--prod', '--frozen-lockfile', '--trust-lockfile']))
-    const packageSet = readDesktopCorePackageSet(BUILD_ROOT, release.version)
+    const packageSet = readDesktopCorePackageSet(BUILD_ROOT)
     const targetName = resolveDesktopBuildTarget()
     const target = { platform: process.platform, arch: desktopTargetPlatform(targetName).arch }
     const modules = join(BUILD_ROOT, 'node_modules')

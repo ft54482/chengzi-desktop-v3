@@ -56,6 +56,7 @@ export function desktopTargetBuildPaths(target) {
     packedDsh: join(packed, 'dsh'),
     packedVendor: join(packed, 'vendor'),
     packedLandlock: join(packed, 'landlock'),
+    packedChengzi: join(packed, 'chengzi'),
     downloads: join(BUILD_ROOT, 'downloads'),
   }
 }

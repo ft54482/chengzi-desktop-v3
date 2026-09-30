@@ -104,6 +104,10 @@ export abstract class ReleaseFamily {
   /** Repository-relative glob patterns selecting this family's manifests. */
   abstract readonly patterns: readonly string[]
 
+  /** Directory prefixes this family skips entirely (fork layers excluded from
+   *  the official release set; see DshFamily for the chengzi side channel). */
+  protected readonly excludedDirectories: readonly string[] = []
+
   /** Git tag prefix this family publishes from. */
   abstract readonly tagPrefix: string
 
@@ -127,6 +131,7 @@ export abstract class ReleaseFamily {
     const seen = new Set<string>()
     for (const manifestPath of manifestPaths) {
       const normalized = manifestPath.replaceAll('\\', '/')
+      if (this.excludedDirectories.some(prefix => normalized.startsWith(prefix))) continue
       const manifest = readManifest(resolve(root, manifestPath))
       if (manifest.private === true) continue
       const name = requireString(manifest, 'name', normalized)
@@ -326,6 +331,11 @@ class DshFamily extends ReleaseFamily {
     'apps/*/package.json',
   ] as const
   readonly tagPrefix = 'dsh-v'
+
+  /** Chengzi fork layer: the branded plugin packs stay out of the official
+   *  @deepseek-ai family (own names, own version line); the Desktop packaging
+   *  pipeline packs them through its own side channel instead. */
+  protected override readonly excludedDirectories = ['packages/chengzi/']
 
   /** Require current artifacts from a complete official client build. */
   override verifyBuildArtifacts(root: string): void {
