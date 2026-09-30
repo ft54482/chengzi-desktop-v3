@@ -1,0 +1,26 @@
+# The Chengzi PRO layer: every `dsh-plugin-chengzi-*` row this fork mounts on
+# the web surface lives in this ONE file, listed after `./cordis.patch.yml` in
+# `package.json` `dsh.bundle.patch` (before the agent presets). Adding a chengzi
+# plugin to the bundle is two lines: a `workspace:*` dependency row in this
+# package's `dependencies`, and one `insert` entry below.
+#
+# Rows here register on the HOST plane, so their tools land in the tools
+# registry's global layer and every agent preset's sessions see them without
+# per-preset edits. Plugin policy defaults live in each plugin's own Config
+# schema; override them here per row if a deployment ever needs to.
+
+- insert:
+    # generate_image: per-call platform image generation billed to the
+    # signed-in account, with a cost/resolution confirmation card (approval
+    # intent); the platform key resolves per call through the credential seam.
+    - id: chengzi-image
+      name: 'dsh-plugin-chengzi-image'
+    # account: BFF 登录/充值/会话、平台 provider/钥匙按计费组分组同步、
+    # 默认模型钦定（deepseek-v4.1-flash 优先）、设置页（账号/关于）与登录门。
+    - id: chengzi-account
+      name: 'dsh-plugin-chengzi-account'
+    # experts: BFF 专家目录物化+agentPresets 挂载、技能包同步、云端我的专家、
+    # footer 入口+专家 main 面板+会话 dock 身份卡（host 面；client 面在
+    # cordis.patch.yml 浏览器 roster 的 chengzi-experts 行）。
+    - id: chengzi-experts
+      name: 'dsh-plugin-chengzi-experts'

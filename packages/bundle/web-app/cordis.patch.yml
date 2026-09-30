@@ -300,6 +300,11 @@
     - id: ui-plugin-manager
       name: '@deepseek-ai/dsh-client-ui-plugin-manager'
 
+    # Chengzi PRO experts: sidebar footer launcher + Experts main panel +
+    # expert identity dock; client plane of dsh-plugin-chengzi-experts.
+    - id: chengzi-experts
+      name: 'dsh-plugin-chengzi-experts'
+
     # Read-only Plugin list tab in the Settings Plugins section; the built-in
     # bundles the sidebar page leaves out are inspected here.
     - id: ui-settings-plugin-inventory

@@ -23,6 +23,7 @@
       "default": "./lib/startup.js"
     },
     "./cordis.patch.yml": "./cordis.patch.yml",
+    "./chengzi.patch.yml": "./chengzi.patch.yml",
     "./presets/*.patch.yml": "./presets/*.patch.yml",
     "./src/*": "./src/*",
     "./package.json": "./package.json"
@@ -31,6 +32,7 @@
     "lib/index.js",
     "lib/startup.js",
     "cordis.patch.yml",
+    "chengzi.patch.yml",
     "presets/standard.patch.yml",
     "presets/ptc.patch.yml",
     "presets/minimal.patch.yml",
@@ -42,6 +44,7 @@
     "bundle": {
       "patch": [
         "./cordis.patch.yml",
+        "./chengzi.patch.yml",
         "./presets/standard.patch.yml",
         "./presets/ptc.patch.yml",
         "./presets/minimal.patch.yml",
@@ -176,7 +179,10 @@
     "@deepseek-ai/dsh-client-ui-shortcuts": "workspace:*",
     "@deepseek-ai/dsh-client-product-analytics": "workspace:*",
     "@deepseek-ai/dsh-host-product-telemetry-otel": "workspace:*",
-    "@deepseek-ai/dsh-client-ui-settings-session-log": "workspace:*"
+    "@deepseek-ai/dsh-client-ui-settings-session-log": "workspace:*",
+    "dsh-plugin-chengzi-image": "workspace:*",
+    "dsh-plugin-chengzi-account": "workspace:*",
+    "dsh-plugin-chengzi-experts": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",
