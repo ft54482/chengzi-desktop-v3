@@ -212,8 +212,13 @@ function createWindow(preload: string, show = false, primary = false): BrowserWi
     show,
     ...(process.platform === 'win32' && primary ? {
       titleBarStyle: 'hidden' as const,
-      titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: chromeFallbackFill(),
-        symbolColor: nativeTheme.shouldUseDarkColors ? '#f9fafb' : '#0f1115' },
+      // Chengzi brand: the product ships a dark UI regardless of the OS color
+      // scheme, so the native overlay must start dark too — following
+      // chromeFallbackFill() here paints a white strip on light-theme Windows
+      // until the web layer pushes its real colors over windowsAppearance.
+      // The IPC update after client stylesheet installation still refines it.
+      titleBarOverlay: { height: WINDOWS_TITLEBAR_HEIGHT, color: '#1b1b1c',
+        symbolColor: '#f9fafb' },
     } : {}),
     // hiddenInset places traffic lights inside the sidebar; sidebar vibrancy
     // needs a transparent window background to show through the page.
