@@ -95,7 +95,7 @@ describe('aoci tool behaviour', () => {
   })
 
   it('answers not-installed with an install guide when no binary is resolvable', async () => {
-    const { ctx, tools } = await boot()
+    const { ctx } = await boot()
     await ctx.plugin({ inject: [...inject], apply }).await()
     vi.stubEnv('AOCI_PATH', join(tmpdir(), 'chengzi-aoci-missing.exe'))
     vi.stubEnv('PATH', '')
@@ -106,7 +106,7 @@ describe('aoci tool behaviour', () => {
   })
 
   it('rejects subcommands outside the whitelist at schema level', async () => {
-    const { ctx, tools } = await boot()
+    const { ctx } = await boot()
     await ctx.plugin({ inject: [...inject], apply }).await()
     const result = await runTool(ctx, process.cwd(), 'mcp')
     expect(result.isError).toBe(true)
@@ -122,7 +122,7 @@ describe('aoci tool behaviour', () => {
       execFileSync('git', ['init', '-q'], { cwd: work })
       execFileSync(real, ['init', '--locale', 'zh-CN'], { cwd: work, stdio: ['ignore', 'ignore', 'inherit'] })
       vi.stubEnv('AOCI_PATH', real)
-      const { ctx, tools } = await boot()
+      const { ctx } = await boot()
       await ctx.plugin({ inject: [...inject], apply }).await()
       const result = await runTool(ctx, work, 'capabilities')
       expect(result.isError).toBe(false)
