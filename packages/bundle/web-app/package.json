@@ -188,7 +188,8 @@
     "dsh-plugin-chengzi-image": "workspace:*",
     "dsh-plugin-chengzi-account": "workspace:*",
     "dsh-plugin-chengzi-experts": "workspace:*",
-    "dsh-plugin-chengzi-brand": "workspace:*"
+    "dsh-plugin-chengzi-brand": "workspace:*",
+    "dsh-plugin-chengzi-aoci": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

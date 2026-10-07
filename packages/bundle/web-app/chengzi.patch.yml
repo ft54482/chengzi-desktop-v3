@@ -24,6 +24,10 @@
     # cordis.patch.yml 浏览器 roster 的 chengzi-experts 行）。
     - id: chengzi-experts
       name: 'dsh-plugin-chengzi-experts'
+    # aoci: 会话工作区内运行 aoci-code CLI（status/capabilities/scan/init/
+    # verify 等白名单子命令），仓库认知索引读写；host 面单行即可（无 client 面）。
+    - id: chengzi-aoci
+      name: 'dsh-plugin-chengzi-aoci'
 
 # ── 橙子PRO v3：平台生态锁定与默认模型兜底（H 追加层） ────────────────────────
 # 以下为按 id 覆盖/预置的顶层 patch 条目（loader 语义：后层覆盖先层、整组
