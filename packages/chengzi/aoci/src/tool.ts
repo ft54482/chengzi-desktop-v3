@@ -107,6 +107,7 @@ export function defineAociTool() {
     parameters: {
       subcommand: {
         type: 'string',
+        required: true,
         enum: [...SUBCOMMANDS],
         description: 'aoci 子命令（白名单）。',
       },
@@ -143,13 +144,17 @@ export function defineAociTool() {
       if (typeof sessionCwd !== 'string' || sessionCwd.length === 0) {
         throw new Error('aoci 需要一个会话工作区（session workspace）；请在打开项目的工作区会话中调用。')
       }
-      const rawArgs = args.args
-      const forwarded: string[] = Array.isArray(rawArgs)
-        ? rawArgs.filter((arg): arg is string => typeof arg === 'string' && arg.length > 0 && arg.length <= MAX_ARG_LENGTH).slice(0, MAX_ARGS)
-        : []
+      const cwd: string = sessionCwd
+      const rawArgs = Array.isArray(args.args) ? args.args : []
+      const forwarded: string[] = []
+      for (const arg of rawArgs) {
+        if (typeof arg === 'string' && arg.length > 0 && arg.length <= MAX_ARG_LENGTH) forwarded.push(arg)
+        if (forwarded.length >= MAX_ARGS) break
+      }
       const requested = typeof args.timeoutMs === 'number' && args.timeoutMs > 0 ? args.timeoutMs : DEFAULT_TIMEOUT_MS
       const timeout = Math.min(Math.max(requested, 1_000), MAX_TIMEOUT_MS)
-      const run = await execAoci(binary, ['--json', args.subcommand, ...forwarded], sessionCwd, timeout)
+      const subcommand: string = args.subcommand
+      const run = await execAoci(binary, ['--json', subcommand, ...forwarded], cwd, timeout)
       const code = run.error === null || run.error.code === undefined ? 0 : Number(run.error.code)
       const out = truncate(run.stdout)
       const err = truncate(run.stderr)

@@ -49,7 +49,7 @@ interface RunToolResult {
   }
 }
 
-async function runTool(ctx: Context, tools: ToolRuntime, work: string, subcommand: string): Promise<RunToolResult> {
+async function runTool(ctx: Context, work: string, subcommand: string): Promise<RunToolResult> {
   const agent = agentWith(work)
   ctx.agents.enter(agent, undefined)
   const result = await ctx.tools.execute({
@@ -99,7 +99,7 @@ describe('aoci tool behaviour', () => {
     await ctx.plugin({ inject: [...inject], apply }).await()
     vi.stubEnv('AOCI_PATH', join(tmpdir(), 'chengzi-aoci-missing.exe'))
     vi.stubEnv('PATH', '')
-    const result = await runTool(ctx, tools, process.cwd(), 'status')
+    const result = await runTool(ctx, process.cwd(), 'status')
     expect(result.isError).toBe(false)
     expect(result.value.status).toBe('not-installed')
     expect(result.value.installGuide).toContain('aoci-spec/aoci-code')
@@ -108,7 +108,7 @@ describe('aoci tool behaviour', () => {
   it('rejects subcommands outside the whitelist at schema level', async () => {
     const { ctx, tools } = await boot()
     await ctx.plugin({ inject: [...inject], apply }).await()
-    const result = await runTool(ctx, tools, process.cwd(), 'mcp')
+    const result = await runTool(ctx, process.cwd(), 'mcp')
     expect(result.isError).toBe(true)
   })
 
@@ -124,7 +124,7 @@ describe('aoci tool behaviour', () => {
       vi.stubEnv('AOCI_PATH', real)
       const { ctx, tools } = await boot()
       await ctx.plugin({ inject: [...inject], apply }).await()
-      const result = await runTool(ctx, tools, work, 'capabilities')
+      const result = await runTool(ctx, work, 'capabilities')
       expect(result.isError).toBe(false)
       expect(result.value.status).toBe('ok')
       expect(result.value.stdout).toContain('aoci-capability-manifest')
