@@ -11,6 +11,7 @@ import { renderPrompt } from '@deepseek-ai/dsh-system-prompt'
 import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { apply, AOCI_SECTION_TEXT, inject, name } from '../src/index.ts'
+import { sanitizeForwardedArgs } from '../src/tool.ts'
 
 function agentWith(cwd: string): Agent {
   const agentId = SessionId('chengzi-aoci-agent')
@@ -49,14 +50,14 @@ interface RunToolResult {
   }
 }
 
-async function runTool(ctx: Context, work: string, subcommand: string): Promise<RunToolResult> {
+async function runTool(ctx: Context, work: string, subcommand: string, args: string[] = []): Promise<RunToolResult> {
   const agent = agentWith(work)
   ctx.agents.enter(agent, undefined)
   const result = await ctx.tools.execute({
     signal: new AbortController().signal,
     callId: ToolCallId(`call-${subcommand}`),
     name: 'aoci',
-    arguments: { subcommand },
+    arguments: { subcommand, args },
     agent,
   })
   return { isError: result.isError, value: result.value as RunToolResult['value'] }
@@ -112,6 +113,14 @@ describe('aoci tool behaviour', () => {
     expect(result.isError).toBe(true)
   })
 
+  it('strips repo-redirect flags so args cannot point at another project', () => {
+    expect(sanitizeForwardedArgs(['--repo', 'D:/somewhere/else', 'scan'])).toEqual(['scan'])
+    expect(sanitizeForwardedArgs(['--repo=D:/somewhere/else', 'status'])).toEqual(['status'])
+    expect(sanitizeForwardedArgs(['agent', 'guide', '--json', '--repo', 'D:/x'])).toEqual(['agent', 'guide', '--json'])
+    expect(sanitizeForwardedArgs([1, null, '', 'ok'])).toEqual(['ok'])
+    expect(sanitizeForwardedArgs(Array.from({ length: 30 }, (_, index) => `a${index}`))).toHaveLength(16)
+  })
+
   it('runs the real binary when AOCI_PATH points at one (local smoke, skipped without env)', async () => {
     const real = process.env.CHENGZI_AOCI_TEST_BINARY
     if (real === undefined || real.length === 0) return
@@ -128,6 +137,27 @@ describe('aoci tool behaviour', () => {
       expect(result.isError).toBe(false)
       expect(result.value.status).toBe('ok')
       expect(result.value.stdout).toContain('aoci-capability-manifest')
+    } finally {
+      rmSync(work, { recursive: true, force: true })
+    }
+  })
+
+  it('stays locked to the session workspace when args try --repo (local smoke, skipped without env)', async () => {
+    const real = process.env.CHENGZI_AOCI_TEST_BINARY
+    if (real === undefined || real.length === 0) return
+    const work = mkdtempSync(join(tmpdir(), 'chengzi-aoci-'))
+    try {
+      execFileSync('git', ['init', '-q'], { cwd: work })
+      execFileSync(real, ['init', '--locale', 'zh-CN'], { cwd: work, stdio: ['ignore', 'ignore', 'inherit'] })
+      vi.stubEnv('AOCI_PATH', real)
+      const { ctx } = await boot()
+      await ctx.plugin({ inject: [...inject], apply }).await()
+      // If --repo were honored, aoci would exit 3 failing to discover a
+      // governed repository at the foreign path; stripped, it falls back to
+      // cwd discovery inside `work` and answers ok.
+      const result = await runTool(ctx, work, 'status', ['--repo', join(tmpdir(), 'chengzi-aoci-elsewhere-must-not-exist')])
+      expect(result.isError).toBe(false)
+      expect(result.value.status).toBe('ok')
     } finally {
       rmSync(work, { recursive: true, force: true })
     }

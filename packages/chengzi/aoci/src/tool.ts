@@ -64,6 +64,33 @@ export function resolveAociBinary(env: NodeJS.ProcessEnv = process.env): string 
   return undefined
 }
 
+/** True for aoci's only repository-override flag, `--repo` ("explicit
+ *  repository root, overrides automatic discovery"). Forwarding it would let a
+ *  session read or write another project's cognition index, so the tool strips
+ *  both spellings — the bare flag together with its following value, so the
+ *  path cannot survive as a positional argument. */
+export function isRepoOverrideArg(arg: string): boolean {
+  return arg === '--repo' || arg.startsWith('--repo=')
+}
+
+/** Whitelist-shape the forwarded args: strings only, length-capped, capped
+ *  count, and with every `--repo` redirect removed. The session workspace is
+ *  the only repository this tool will ever touch. */
+export function sanitizeForwardedArgs(rawArgs: readonly unknown[]): string[] {
+  const forwarded: string[] = []
+  for (let index = 0; index < rawArgs.length; index += 1) {
+    const arg = rawArgs[index]
+    if (typeof arg !== 'string' || arg.length === 0 || arg.length > MAX_ARG_LENGTH) continue
+    if (isRepoOverrideArg(arg)) {
+      if (arg === '--repo') index += 1
+      continue
+    }
+    forwarded.push(arg)
+    if (forwarded.length >= MAX_ARGS) break
+  }
+  return forwarded
+}
+
 function truncate(value: string): string {
   return value.length > OUTPUT_LIMIT_BYTES
     ? `${value.slice(0, OUTPUT_LIMIT_BYTES)}\n…（输出超过 32KB 已截断）`
@@ -113,7 +140,7 @@ export function defineAociTool() {
       },
       args: {
         type: 'array',
-        description: '透传给子命令的参数（如 ["agent","guide","--json"] 配合 subcommand=index）。',
+        description: '透传给子命令的参数（如 ["agent","guide","--json"] 配合 subcommand=index）。仓库重定向旗标 --repo 会被剥离：索引始终锁定当前会话工作区所属仓库，不读写其他项目。',
         items: { type: 'string' },
       },
       timeoutMs: {
@@ -146,11 +173,7 @@ export function defineAociTool() {
       }
       const cwd: string = sessionCwd
       const rawArgs = Array.isArray(args.args) ? args.args : []
-      const forwarded: string[] = []
-      for (const arg of rawArgs) {
-        if (typeof arg === 'string' && arg.length > 0 && arg.length <= MAX_ARG_LENGTH) forwarded.push(arg)
-        if (forwarded.length >= MAX_ARGS) break
-      }
+      const forwarded = sanitizeForwardedArgs(rawArgs)
       const requested = typeof args.timeoutMs === 'number' && args.timeoutMs > 0 ? args.timeoutMs : DEFAULT_TIMEOUT_MS
       const timeout = Math.min(Math.max(requested, 1_000), MAX_TIMEOUT_MS)
       const subcommand: string = args.subcommand

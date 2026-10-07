@@ -36,6 +36,7 @@ export const AOCI_SECTION_TEXT = [
   '4. 客户暂不需要：正常开工，不要反复推销。',
   '',
   '`aoci` 是本地工具：索引是纯文本（aoci.txt）并随 Git 版本化，只在客户机器本地运行。',
+  '工具严格按项目隔离：aoci 绑定当前会话工作区所属仓库（`--repo` 重定向会被剥离），一个项目的索引只服务本项目的会话，绝不要尝试读取或写入其他项目的索引。',
 ].join('\n')
 
 export function apply(ctx: Context, config: Config = { enabled: true }): void {
