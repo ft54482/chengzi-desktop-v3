@@ -91,21 +91,26 @@ describe('chengzi browser-brand plugin', () => {
     hero.unmount()
   })
 
-  it('renders the wordmark and the brand-orange slice artwork', () => {
+  it('renders the wordmark and the monochrome slice artwork', () => {
     const name = render(<ChengziBrandName />)
     expect(name.container.textContent).toBe('橙子PRO')
     name.unmount()
 
     const mark = render(<ChengziBrandMark size={24} />)
-    expect(mark.container.querySelector('circle')?.getAttribute('fill')).toBe('#E8732A')
+    // Monochrome line art: outlined disc (no brand fill), tone inherits the
+    // host text color — no fixed brand orange anywhere in the mark.
+    const disc = mark.container.querySelector('circle')
+    expect(disc?.getAttribute('fill')).toBeNull()
+    expect(disc?.getAttribute('stroke')).toBe('currentColor')
+    expect(mark.container.innerHTML).not.toContain('#E8732A')
     mark.unmount()
   })
 
-  it('carries the complete-build version badge on complete builds', () => {
+  it('never renders the complete-build version badge (removed: unreadable light chip)', () => {
     vi.stubEnv('DSH_CLIENT_VERSION', '3.0.0')
     vi.stubEnv('DSH_CLIENT_COMMIT_HASH', 'abc1234')
     const name = render(<ChengziBrandName />)
-    expect(name.container.textContent).toBe('橙子PRO3.0.0-abc1234')
+    expect(name.container.textContent).toBe('橙子PRO')
     name.unmount()
     vi.unstubAllEnvs()
   })
