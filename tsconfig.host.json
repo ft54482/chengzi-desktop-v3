@@ -479,6 +479,7 @@
     { "path": "./packages/chengzi/experts/tsconfig.host.json" },
     { "path": "./packages/chengzi/brand/tsconfig.host.json" },
     { "path": "./packages/chengzi/aoci" },
+    { "path": "./packages/chengzi/hzcfjt" },
     { "path": "./packages/host/plugin-inventory" },
     { "path": "./packages/chengzi/image" },
     { "path": "./packages/boot/plugin-manager" },
