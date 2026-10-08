@@ -1,0 +1,1017 @@
+#AOCI-CODE-VOLUME: 1
+
+===D:/chengzi-pro/dsh-official/===
+package.json[FV9T]: F:pnpm@11.7.0 monorepo 根：workspaces+全局脚本+engines | R:code:pnpm-workspace.yaml | A:全仓 | S:包内不得声明自己的 typescript devDep（TS5.9 会遮蔽根 6.0.3 导致莫名类型错）；pnpm11 allowBuilds 会静默跳过 electron postinstall，需手动 node .../electron/install.js
+pnpm-workspace.yaml[FV8T]: F:workspace 通配定义，packages/chengzi/* 定制旁路包由此被收录 | R:code:package.json | A:全仓 | S:新 chengzi 包免改此文件即入 workspace，但进 bundle 还需 web-app package.json 依赖行+chengzi.patch.yml insert 行+tsconfig.host.json references 三件套
+AGENTS.md[SG8S]: F:上游 DSH 工作区 agent 指令（包组织/契约/发版纪律） | R:- | A:开发会话 | S:aoci init 在此追加了托管区块（原内容未动）；区块由 aoci 工具自身管理勿手工改
+README.md[SG8T]: F:上游 DSH 项目说明：产品定位/快速上手/包结构导览 | R:code:package.json | A:新会话首读 | S:fork 后上游 README 未改写（品牌层走 chengzi 包与 locale，不在此文件）；读它了解官方包组织，定制面另见 packages/chengzi 与 chengzi.patch.yml
+
+===D:/chengzi-pro/dsh-official/packages/bundle/web-app/===
+chengzi.patch.yml[FV9S]: F:chengzi 定制收纳层：6 插件 host 面插入+官方 llm-deepseek/llm-account 禁用+agent-default-model 钦定 | R:code:packages/bundle/web-app/cordis.patch.yml | A:code:packages/bundle/web-app | S:patch 语义是整组替换不合并——改一个 list 必须把该键全部条目写全；!!js 块内连注释都不能出现，否则构建期炸
+package.json[FV9M]: F:web-app bundle 装配依赖面（进包插件 roster 的依赖来源） | R:code:packages/bundle/web-app/chengzi.patch.yml | A:出包链 | S:dependencies 里加 dsh-plugin-chengzi-*: workspace:* 行是插件进包三件套之一；漏行=插件静默不进包
+cordis.patch.yml[FV9M]: F:client（浏览器）面插件 roster 与宿主 patch | R:code:packages/bundle/web-app/chengzi.patch.yml | A:bundle 装配 | S:client 面 roster 与 host 面插入是两条线：浏览器 UI 插件还要在包里声明 dsh.client+clientBundle preset 产 ./client lazy-CJS bundle
+
+===D:/chengzi-pro/dsh-official/apps/desktop/src/===
+main.ts[EG9L]: F:Electron 主进程入口：窗口/托盘/协议装配 | R:code:apps/desktop/package.json | A:Electron 启动链 | S:titleBarOverlay 初始色固定 #1b1b1c+浅色符号（橙子PRO 品牌深色语义），勿改回跟随系统主题——那是客户否决过的白条缺陷
+account-backend.ts[DN7S]: F:原生账号命令与Gateway状态流 | R:code:apps/desktop/src/welcome-backend.ts | A:main.ts/welcome-backend | S:accountView 白名单校验全部 wire 字段；外链仅放行 https 或 http+loopback 且拒 userinfo；
+backend-controller.ts[AR8S]: F:后端启动/静默拆除状态机 | R:code:apps/desktop/src/host-process.ts | A:main.ts | S:stopping 期间 start 直接拒绝、pending 并发共享同一 attempt；host getter 仅在 ready 且未取消时暴露子进程；子进程异步失败经 failed() 自动 cleanup，启动失败与清理失败合成 AggregateError；close() 永久抑制 publish 且后续 start reject。
+background-notice.ts[AU8T]: F:首次隐藏到托盘的一次性确认 | R:code:apps/desktop/src/tray.ts | A:main.ts | S:只有显式确认（在 userData 写空 marker 文件）才允许首次隐藏；取消的提示保持待确认 eligible；marker 更新保留、卸载删除；dispose 后迟到的对话框响应被忽略；pending 期间重复 close 只 focus 不再弹。
+browser-guests.ts[AS8S]: F:侧栏 webview 客体的租约与隔离 | R:code:apps/desktop/src/ipc.ts | A:main.ts | S:每 workspace 生成进程级 persist partition；会话层拒绝带 userinfo 的 http(s)/ws(s) 与命中 Host 端口的请求，导航白名单 http(s) 且禁 Host；主窗口主导航或渲染崩溃即释放全部 lease；will-attach-webview 强制重写 preferences 并清空 referrer。
+client-metadata.ts[CD7T]: F:单次平台调用的客户端身份 | R:code:apps/desktop/src/platform-view.ts | A:platform-view.ts | S:DSH_CLIENT_VERSION 由 tsdown define 构建期注入 main 包，缺失直接抛错而非猜版本；timezoneOffsetSeconds = -getTimezoneOffset()*60：Date 报西经分钟，平台要东经秒，符号极易搞反。
+command-installation.ts[DB8M]: F:dsh 命令链接的可逆安装 | R:code:apps/desktop/src/command-manager-entry.ts | A:command-manager-entry.ts | S:指纹=entry(dev/ino/mode/uid/gid/size/mtimeNs)+receipt 的 sha256，操作前必须复核用户确认的指纹防 TOCTOU；回执超 8192 字节或非法即 EOWNERSHIP；macOS link() 跟随 symlink 须经 link-entry C 助手；备份名固定 .dsh-command-backup-<uuid>；文件锁 5s。
+command-management.ts[DU7M]: F:命令管理对话框与 worker 驱动 | R:code:apps/desktop/src/command-installation.ts | A:main.ts | S:worker 用打包内私有 node 跑 command-manager.js；macOS 非提权 EACCES/EPERM 经 osascript 提权重试（stderr "(-128)"=用户取消）；
+core-package-set.ts[DD8S]: F:签名的本地核心 npm 包集 | R:code:apps/desktop/src/project-manager.ts | A:project-manager/打包脚本 | S:描述符校验正则+去重+必须按 name 排序；dsh 与 dsh-desktop-host 必须存在且版本匹配；verify 还要求目录文件列表与描述符完全一致并逐个验 sha512；verifyDesktopCoreLockfile 用正则拒绝 lockfile 经 registry 解析任何核心包。
+device-info.ts[DU9T]: F:反馈问卷附带的机器描述 | R:code:apps/desktop/src/ipc.ts | A:main.ts | S:输出固定 name=value 对、"; " 分隔，顺序 platform,os,app_arch,cpu,memory_gib；memory 是总物理内存 GiB 一位小数；单项读取失败/为空只省略该字段；契约明确禁止主机名、用户名、序列号。
+directory-picker.ts[AU8T]: F:窗口属主的目录选择对话框 IPC | R:code:apps/desktop/src/ipc.ts | A:preload-app(__DSH_DIRECTORY_PICKER__) | S:仅接受主窗口主 frame 的 dsh-app://app 发送方（shell 页与子 frame 拒绝）；同窗口并发请求经 WeakMap 合并共享同一 Promise；弹窗前 restore/show/focus；窗口销毁时已开的对话框结果丢弃返回 null。
+host-process.ts[RI8M]: F:Electron Node 模式 Host 子进程生命周期 | R:code:apps/desktop/src/node-environment.ts | A:backend-controller/smoke 脚本 | S:子进程=ELECTRON_RUN_AS_NODE 跑 dsh-desktop-host/lib/index.js；非法 IPC 消息立即 SIGTERM；stop 梯度 10s→SIGTERM→5s→SIGKILL→5s；quit 检查死线 2s、任务锁 10s；stderr 尾 64KiB 拼入失败消息；requireGraceful 非优雅退出拒装更新。
+host-protocol.ts[RC9T]: F:Host 生命周期协议代数常量 | R:code:apps/desktop/src/release.ts | A:release.ts/dev/测试 fixture | S:DESKTOP_HOST_PROTOCOL_VERSION=4 随 release 元数据写入 desktop-runtime.json 并被 parseDesktopRelease 校验；升它必须同步 Host 端与全部测试 fixture，否则打包与运行期直接失败。
+ipc.ts[CG8S]: F:私有 IPC 通道名注册与发送方校验 | R:code:apps/desktop/src/preload-app.ts | A:全部 main 进程模块 | S:DESKTOP_IPC 通道名是壳层私有契约（不得外泄给第三方文档）；assertDesktopSender 要求 dsh-app: scheme+hostname 白名单且 senderFrame 为 null 即拒绝；DesktopUpdateState.message 是主进程自有诊断，绝不接受 renderer 提供的 URL/版本/授权。
+keybindings.ts[PD8T]: F:keybindings.json 设备本地存储 | R:code:packages/client-shortcuts/protocol | A:keyboard.ts | S:文件在 Electron userData 下 0o600/目录 0o700 原子写（writeFileAtomic）；读 ENOENT 视为 null（首次无配置）；publish 回调负责更新原生绑定索引与产品页；写路径只允许 userData，绝不接受 renderer 提供路径。
+keyboard.ts[AU7M]: F:快捷键分发/录制的原生输入拦截 | R:code:apps/desktop/src/keybindings.ts | A:main.ts | S:before-input-event 按 chord 编码（held 集合+排序双键），处理 altgr/dead key/自动重复；拦截后清空 held（Electron 可能漏 keyup）；编辑器焦点时忽略菜单快捷键；
+locale.ts[LL7M]: F:en/zh 全量文案与语言解析 | R:code:apps/desktop/src/welcome-api.ts | A:全部窗口与对话框 | S:zh 用 satisfies 强制两语言键全集一致（漏译编译失败）；启动语言先 preference 再按 OS languages 主子标签匹配、回退 en；resolveDesktopLocale 只按 zh 前缀判定；
+login-shell-environment.ts[RN8S]: F:POSIX 登录 shell 环境探测 | R:code:apps/desktop/src/duration-env.ts | A:main.ts | S:候选=账户 shell（非 $SHELL）→zsh→bash→sh；-ilc 跑 rc 文件，读取以第二个分隔符为准而非 close（rc 后台子进程可长期持有 stdout）；探针环境压 oh-my-zsh 提示与 tmux；DSH_*/ELECTRON_* 不被覆盖；win32 直接返回 base；单 shell 死线 10s。
+mandatory-update-ipc.ts[CS9T]: F:强制更新 IPC 通道名常量 | R:code:apps/desktop/src/mandatory-update-window.ts | A:preload-mandatory/preload-mandatory-overlay | S:三个无依赖通道名（status/state/action）共享给沙箱 preload；独立模态与 win32 内嵌 overlay 两个 preload 用同一组名，主进程按发送方身份区分，改名字必须两处同步。
+mandatory-update-policy.ts[DS8M]: F:强制更新策略轮询与解析 | R:code:apps/desktop/src/policy-test-auth.ts | A:main.ts | S:origin 必须 https（仅 allowLoopback 可 http 127.0.0.1）且无路径/凭据；业务码 40005=强制（title/detail/page 全部白名单校验），code 0+biz_code 0=放行，其余抛错；失败保留既有 blocking；退避指数封顶 maxBackoff 加 jitter；win32 强制 arch=x64。
+mandatory-update-window.ts[AS7M]: F:强制更新模态/内嵌控制器 | R:code:apps/desktop/src/mandatory-update-policy.ts | A:main.ts | S:win32 内嵌主窗口文档，其余平台独立透明子窗口；blocking 解除后 150ms 销毁；安装确认绑定 version+revision，过期抛错；blocking 期间 close 转 app.quit()（保底退出）；
+microphone-permissions.ts[AS8T]: F:麦克风权限边界 | R:code:apps/desktop/src/ipc.ts | A:main.ts session | S:只收紧 'media' 权限：主 frame+主窗口 contents+dsh-app://app origin+audio 单类型；非 media 一律放行维持 Electron 默认；darwin 的 check 还要求系统麦克风状态 granted，request 走 askForMediaAccess 异步裁决；非法 frame URL 直接视为不可用。
+node-environment.ts[RC9T]: F:Electron Node 模式环境构造 | R:code:apps/desktop/src/host-process.ts | A:host-process/smoke 脚本 | S:ELECTRON_RUN_AS_NODE=1 让 Electron 以 Node 跑；给 bin 时同时设 DSH_DESKTOP_NODE_EXECUTABLE 并把 bin 前置 PATH（供包脚本解析私有 node）；其余环境原样继承给插件子进程，不做过滤——调用方需自行决定是否先 scrub。
+owned-directory.ts[DR8T]: F:不跟随链接的属主目录删除 | R:code:apps/desktop/src/project-manager.ts | A:test 脚本/main | S:绝不用 fs.rm recursive：Electron 的递归 rm 会跟随嵌套 Windows junction 进安装资源；根是 symlink 只 unlink 自身不进入目标；缺失根静默忽略；非目录非链接抛错；逐项 unlink 后 rmdir。
+paths.ts[PC9T]: F:桌面 profile 路径解析 | R:code:packages/dsh-home-paths | A:main.ts/project-manager | S:profile 与 lock 都在共享 DSH home 的 profiles/desktop 下（与 npm 安装的 dsh 共享同一 home）；只解析不创建、不改共享数据根；lock 是普通文件而非目录。
+platform-ipc.ts[CS9T]: F:平台桥私有通道名 | R:code:apps/desktop/src/platform-view.ts | A:preload-platform-account/preload-app | S:bootstrap 是 sendSync（preload 需同步取得 token）；PlatformLocale 只有 en_US|zh_CN 两个合法值；bootstrap/localeChanged 私有，open/bounds/close 由 window.dshPlatform 暴露；改名会同时断三处。
+platform-view.ts[AI7M]: F:内嵌平台账号 WebContentsView | R:code:apps/desktop/src/preload-platform-account.ts | A:main.ts | S:partition 按 userId 用 sha256(origin+userId) 持久化，无身份则一次性随机；每次 open/close 清 cookies/storage/认证缓存；
+policy-test-auth.ts[SI7S]: F:飞书测试登录窗口与会话 | R:code:apps/desktop/src/mandatory-update-policy.ts | A:main.ts | S:独立非持久 partition，dispose 清连接+存储+认证缓存；仅同 origin 根路径或 /feishu_auth_callback 判 returned；
+preload-app.ts[ES8S]: F:产品窗口总 preload 桥 | R:code:apps/desktop/src/ipc.ts | A:渲染端 Web UI | S:仅在 dsh-app://app 暴露各桥；非主 frame 降级为空壳（主进程仍二次校验）；shortcutsInput 按 activeElement 的 iframe/webview 名过滤；__DSH_HOST_PATHS__ 用 webUtils 取文件真实路径供 @path 引用；win32 才装强制更新 overlay。
+preload-browser.ts[ES8T]: F:浏览器租约操作桥 | R:code:apps/desktop/src/browser-guests.ts | A:Web UI 侧栏 | S:每窗口一条主进程事件订阅，按 lease 分发回调且事件载荷先做形状校验；退订在最后一个回调移除时删除分组；不暴露 IPC 或 Electron 对象本身。
+preload-mandatory-overlay.ts[EU8T]: F:主文档内嵌强制更新遮罩 | R:code:apps/desktop/src/mandatory-update-ipc.ts | A:preload-app(win32) | S:closed shadow root+iframe，z-index 2147483647、top=标题栏 40px；动作经 MessageChannel 自增 id 配对回执；blocking 解除 150ms 后移除；keydown 捕获阶段拦非菜单按键；status 初次失败静默（开发可无策略配置）。
+preload-mandatory.ts[ES8T]: F:独立强制更新模态桥 | R:code:apps/desktop/src/mandatory-update-ipc.ts | A:mandatory-update.html | S:仅当 location.href==='dsh-app://shell/mandatory-update.html' 才 exposeInMainWorld('dshMandatoryUpdate')；subscribe 返回退订函数；action 携带 version+confirmationRevision 由主进程复核。
+preload-menu.ts[EU8S]: F:Windows 标题栏菜单 DOM | R:code:apps/desktop/src/ipc.ts | A:preload-windows | S:挂载等待 [data-shell-overlay] 出现（AppFrame 拥有该席位，boot 就绪先于渲染应用）；点击前在 focusout 捕获阶段记录编辑器焦点/选区并在菜单打开后恢复；菜单定位经 IPC windowsMenu 传 rect 由主进程弹原生菜单；语言取 documentElement.lang，update() 重建标签。
+preload-platform-account.ts[ES8T]: F:平台凭据一次性复制桥 | R:code:apps/desktop/src/platform-view.ts | A:平台嵌入页 | S:仅主 frame 且 origin 等于 --dsh-platform-origin= 参数才暴露 window.dsh；token 在 bootstrap(sendSync) 一次性复制进闭包，getter 纯内存永不 IPC；校验失败保持 embedded 但 token undefined，平台无法借用浏览器凭据。
+preload-platform.ts[EZ8T]: F:文档平台标记与全屏镜像 | R:code:apps/desktop/src/ipc.ts | A:全部 Web 文档 | S:preload 运行时 documentElement 可能尚不存在，必须等 DOMContentLoaded；data-fullscreen 监听只在 darwin/win32 安装（主进程只在这两平台发送）；退出全屏用 delete dataset 而非置 false。
+preload-theme.ts[EU8T]: F:Web 主题源镜像到原生主题 | R:code:apps/desktop/src/ipc.ts | A:Web UI/nativeTheme | S:监听 html[data-ds-theme-source] 转发主进程设 nativeTheme；值未变不重发；loading 时等 DOMContentLoaded 再挂 Observer（主题 bootstrap 在其前写属性）；macOS 振动材质与 prefers-color-scheme 都消费该值。
+preload-update-dialog.ts[ES8T]: F:更新对话框只读应答桥 | R:code:apps/desktop/src/update-dialog.ts | A:update-dialog.html | S:仅 location.href==='dsh-app://shell/update-dialog.html' 才暴露 dshUpdateDialog；respond 只回显 revision+按钮索引，新鲜度由主进程校验；无任何主动能力（不开 URL 不授权）。
+preload-welcome.ts[EU8T]: F:欢迎窗口隔离桥 | R:code:apps/desktop/src/welcome-api.ts | A:welcome.html | S:启动即从 process.argv 解析 --dsh-welcome-locale=，缺失直接抛错（preload 失败=不可用窗口）；analytics 先 analyticsEnabled 再 invoke（渲染端策略检查+主进程白名单双重）；onAccountState 用 removeListener 退订。
+preload-windows.ts[EU8T]: F:Windows 标题栏外观同步 | R:code:apps/desktop/src/preload-menu.ts | A:preload-app(win32) | S:win32 only；写标题栏 CSS 变量 40px；用 1x1 canvas 把侧栏 CSS 变量解析成实际 rgba 发主进程染原生标题栏；观察 html lang、body 主题属性与 head 变化，head load 也触发；颜色未变不重发；pagehide 全清理。
+project-manager.ts[PD8S]: F:profile 初始化/锁定与恢复 | R:code:apps/desktop/src/core-package-set.ts | A:main.ts/dev 脚本 | S:lock 文件 wx 排他，EEXIST 读 pid 探活，仅死进程残留才清理重取；lock 为 symlink/非常规文件抛错；Chengzi fork：createRuntimeProjectMetadata 不钉壳版本到 runtime 包集（两版本解耦）；disableAllPlugins 前必须停 Host。
+quit-confirmation.ts[AR8T]: F:退出前任务确认对话框 | R:code:apps/desktop/src/host-process.ts | A:main.ts | S:inspection 为 'unknown'（失败/超时）按有活动任务处理而非静默退出；决策期间任务变化不改文案、批准后不复查；dispose 后 pending 决议 false（绕过式退出），已开的原生框无关闭 API 随进程消失；win32 按钮数组顺序即显示顺序，macOS index0 排最右（Quit/Cancel 布局相反）。
+release.ts[FC9T]: F:壳与运行时共享的版本身份 | R:code:apps/desktop/src/host-protocol.ts | A:runtime-tree/打包脚本 | S:parseDesktopRelease 强制 schemaVersion===1、三个 semver 字段合法、hostProtocolVersion 等于编译期常量；凡从磁盘资源读入的 release 元数据都过这里，无兼容回退分支。
+runtime-tree.ts[RV8M]: F:运行时清单封存与完整性验证 | R:code:apps/desktop/src/core-package-set.ts | A:打包脚本/main.ts | S:清单记录全树 sha256；runtimePath 拒绝绝对路径/反斜杠/盘符/..段；executable 位 Windows 恒 false，verify 时剥离再比对；描述符校验 dsh 与 dsh-desktop-host 版本一致；Windows 签名改字节后必须重封清单再验。
+single-instance.ts[RR9T]: F:单实例锁申请 | R:code:apps/desktop/src/main.ts | A:main.ts | S:requestSingleInstanceLock 失败必须立即 quit 并返回 false（不得再碰 profile）；second-instance 回调负责 focus/重建主窗口；锁是进程生命周期的，须在任何 profile 访问之前申请。
+tray.ts[AU8T]: F:Windows 常驻托盘 | R:code:apps/desktop/scripts/render-tray-icon.ts | A:main.ts | S:图标必须用 render-tray-icon 生成的多尺寸 ICO（Windows 按 DPI 选位图，非缩放单图）；tooltip 复用 aboutProduct 文案；quit 走与其他退出相同的确认路径；dispose 在退出确认后才调用防死图标残留；托盘全程存在而非仅窗口隐藏时。
+update-attention.ts[OU8T]: F:下载就绪提醒（闪烁/通知） | R:code:apps/desktop/src/mandatory-update-window.ts | A:mandatory-update-window | S:每个已下载版本只提醒一次（version 去重），reset() 开启新下载回合；win32 flashFrame、darwin dock bounce informational；通知 silent，点击=回到确认（绝不授权安装）；父窗口或确认模态任一 focus 即 clear（幂等，listener 移除防泄漏）；platform 可注入供测试。
+update-coordinator.ts[DQ7S]: F:更新检查/下载/安装状态机 | R:code:apps/desktop/src/update-http-executor.ts | A:update-schedule/mandatory-update-window | S:channel=nightly+allowPrerelease，必须显式 allowDowngrade=false（设 channel 可能启用 downgrade）；download/install 需版本与确认一致，beforeRestart 拒绝回 ready 不装；
+update-dialog.ts[AU8S]: F:壳层自有的更新确认对话框 | R:code:apps/desktop/src/update-overlay.ts | A:main.ts | S:文档由 main.ts 的 dsh-app://shell 协议路由提供（模态依赖该路由）；respond 校验 revision 防过期提示写回；替换提示时旧 active 以 cancelId 结算不授权任何操作；同 parent 复用窗口（150ms 关闭延迟防闪烁）；owned() 校验 sender/webContents/mainFrame/senderFrame.url 四重。
+update-http-executor.ts[RN8T]: F:更新传输空闲超时 | R:code:apps/desktop/src/update-coordinator.ts | A:update-coordinator | S:继承 ElectronHttpExecutor 保留代理/登录处理；idle 超时是 header 前或 chunk 间静默上限而非总下载时限；Electron 44 可能在 response 前先发 writable close，故 abort/error 也触发 stop；超时合成 code='ETIMEDOUT' 并 request.abort；校验 1000~2147483647。
+update-overlay.ts[AU8T]: F:透明遮罩子窗口工厂 | R:code:apps/desktop/src/update-dialog.ts | A:update-dialog/mandatory-update-window | S:透明无框子窗口随 parent 移动/缩放，parent show 才 show；macOS 用非原生模态（原生 modal 整窗 sheet 动画）并 prepend 拦输入（先于产品快捷键）；active/revision 计数供快捷键判定阻断；sandbox 开、windowOpen deny。
+update-presentation.ts[DU8T]: F:更新失败语义分类 | R:code:apps/desktop/src/ipc.ts | A:main.ts/preload | S:NETWORK_FAILURE 正则（ERR_CONNECTION_*/ETIMEDOUT 等）把失败分为 <op>-network 供本地化选词；install 阶段优先用 preparationFailure kind；presentation 只含 phase/version/floor(percent)/failure，无原始诊断与 URL。
+update-schedule.ts[AR8S]: F:普通更新轮询调度 | R:code:apps/desktop/src/update-coordinator.ts | A:main.ts | S:轮询变量 INTERVAL_MS(600s)/MAX_BACKOFF_MS(默认1h)/JITTER(0.2)；失败倍增退避封顶、成功回 interval，jitter 下限 clamp 1s；手动与自动共享 in-flight check（joined 只推进一次退避）；now 用 performance.now 抗系统对时。
+web-document.ts[IN7T]: F:dsh-app 静态文档与 Host 转发 | R:code:apps/desktop/src/host-process.ts | A:main.ts protocol.handle | S:防路径穿越，index 注入 __DSH_BOOT_READY__ 等 Host 异步注入；Host 认证要求 303+set-cookie；
+welcome-api.ts[DU8T]: F:欢迎窗口操作契约 | R:code:apps/desktop/src/welcome-backend.ts | A:welcome-window/preload-welcome | S:WELCOME_IPC 通道仅在窗口存活期安装；saveApiKey 返回 {ok:boolean} 不带 Provider 诊断（诊断可能含凭据）；needsWelcome=未登录且无任何已配置 key 才需要欢迎流；skip 不写 onboarding 完成设置（下次冷启动会再弹）；takeNotice 一次性取走 session-expired。
+welcome-backend.ts[DN7S]: F:欢迎流 Web RPC 客户端 | R:code:apps/desktop/src/account-backend.ts | A:main.ts | S:credentials.describe 每请求最多 64 个 ref 必须分批；save 只写 llm-deepseek 官方 ref 且校验可见 ASCII（拒绝引号/空格/env 赋值）；
+welcome-window.ts[AU8S]: F:进程唯一欢迎窗与 IPC 安装 | R:code:apps/desktop/src/welcome-backend.ts | A:main.ts | S:进程唯一欢迎窗：先摘旧 IPC handlers 再装新；assertSender 三重校验；analytics 事件白名单（auth_page_click 只许 sign_in|api-key 单键）；loadFile 失败先销毁窗口再抛；windowOpen deny+导航拦截。
+windows-layout.ts[CZ9T]: F:Windows 标题栏高度常量 | R:code:apps/desktop/src/preload-windows.ts | A:preload-windows/preload-mandatory-overlay | S:WINDOWS_TITLEBAR_HEIGHT=40 是 Windows 主窗口标题栏 DIP 高度的唯一事实源，preload 的 CSS 变量与强制更新 overlay 的 top 偏移都引用它；改动需与主进程 caption 相关计算同步。
+crash-report.ts[DO8S]: F:致命错误完整诊断落盘 | R:code:apps/desktop/src/fatal-recovery.ts | A:main.ts | S:文件名 crash-<ISO 冒号点换连字符>-<source>.log，剪枝只删匹配该正则的文件、保留最新 10 份；写入失败仅 console.error 并返回 undefined（诊断辅助不得让恢复流程失败）；renderer console 尾部按 64KiB 字节上限丢头部但超长单行整行保留；error 段 256KiB 截断；flag 'wx' 防覆盖。
+command-manager-entry.ts[EQ8T]: F:提权命令管理 worker 入口 | R:code:apps/desktop/src/command-installation.ts | A:command-management.ts | S:独立 node 进程（macOS 提权经 osascript，win32 走 System32 PowerShell 跑 command-path.ps1、stdin 传 JSON）；macOS 固定 umask 0o022 写公共命令元数据；错误只能写 stdout JSON（osascript 失败时 stdout 会丢，响应体承载错误）；fingerprint 必须 64 位 hex。
+duration-env.ts[CC9T]: F:环境变量毫秒时长统一解析 | R:- | A:update-schedule/login-shell-environment | S:所有 DSH_DESKTOP_*_MS 类变量必须经此读取：1000~2147483647 的安全整数毫秒，越界抛错（错误消息点名变量名）；策略是不 clamp 直接失败，避免静默改行为。
+fatal-recovery.ts[AR8S]: F:首个致命错误的原生恢复对话框 | R:code:apps/desktop/src/crash-report.ts | A:main.ts | S:首个 fatal 独占（后续 report 直接返回）；crash report 写入限时 1s（CRASH_REPORT_WAIT_MS），超时无路径仍弹窗；detail 预算 1200 字符、只保留错误末 8 行；EADDRINUSE 走专用文案且只有退出/重启两键（无禁用插件项）；恢复操作失败回到同一对话框循环显示新错误。
+startup-error.ts[CG9T]: F:可序列化错误状态 | R:code:apps/desktop/src/fatal-recovery.ts | A:fatal-recovery/backend-controller | S:AggregateError 递归拼接嵌套 errors 的 message（换行连接）；非 Error 值走 String()；只保留 message——栈与属性链走 crash-report 文件而非 IPC。
+update-error.ts[CG9T]: F:更新准备失败分类错误 | R:code:apps/desktop/src/ipc.ts | A:update-coordinator | S:kind 是稳定枚举（stop-failed/tasks-changed/tasks-unavailable）供原生与 Web 两套 UI 按 locale 选词；technicalDetails 只能放主进程自有事实，禁止子进程原始输出与凭据（有专项测试钉住该约束）。
+update-journal.ts[OO8T]: F:更新资格证据 JSONL | R:code:apps/desktop/src/ipc.ts | A:安装更新资格脚本 | S:白名单字段，错误文本/URL/请求数据永不落盘；errorCode 固定清单匹配否则 UNCLASSIFIED；文件 0o600 wx 写在安装目录外；每条 flush 后才返回，失败向上传播（不完整资格不得报 traced）；version 是安装版本非 feed 值。
+
+===D:/chengzi-pro/dsh-official/apps/desktop/===
+package.json[FV9S]: F:桌面壳包定义与出包脚本面（package:win:x64:unsigned 等） | R:code:apps/desktop/scripts/package-target.ts | A:发版流水线 | S:壳 version=发版号（3.2.0），与 DesktopRelease.version（上游 dsh 版本）解耦；产物名自动带 -unsigned 后缀，nightly.yml 的 url 必须用真实产物名
+electron-builder.config.mjs[FV9T]: F:electron-builder 常规入口 | R:code:apps/desktop/scripts/electron-builder-config.mjs | A:electron-builder | S:default export=无参工厂调用（普通发版入口）；资格打包路径改为 import 具名工厂传私有 runtime 与版本；目标平台/架构经 DSH_DESKTOP_TARGET_PLATFORM/ARCH 环境注入。
+electron-builder.config.d.mts[FV8T]: F:builder 配置手写类型 | R:code:apps/desktop/electron-builder.config.mjs | A:发布测试/资格脚本 | S:工厂实现在 .mjs 无类型，此为手写契约；nsis.artifactName/shortcutName 是 Chengzi fork 品牌字段（上游无）；files 第 5/6 项是 dsh runtime 两段；mac.dmg.sign=true 且 notarize=false（自管）；win.sign 可注入自定义签名器。
+tsdown.config.ts[FV8S]: F:壳层打包配置 | R:code:apps/desktop/scripts/desktop-bundle-imports.mjs | A:pnpm build | S:main/preload 从 lib/types 二次打包（依赖 workspace 先行 build:lib:host，不能并行）；preload 强制 CJS——沙箱 require 只解析 electron/events/timers/url；DSH_CLIENT_VERSION 是唯一构建期 define；main 的 dependencies 全部打进 bundle。
+
+===D:/chengzi-pro/dsh-official/apps/desktop/scripts/===
+package-target.ts[EV9L]: F:出包总入口：按 target 装配 NSIS/dir 产物 | R:code:apps/desktop/scripts/prepare-package-set.ts | A:发版流水线 | S:出包前必须杀掉运行中的橙子PRO/win-unpacked 实例，否则 EPERM 静默失败
+prepare-package-set.ts[EV8M]: F:多目录旁路 pack（官方家族+chengzi 侧道）产出 packed 集 | R:code:apps/desktop/scripts/release/families.ts | A:code:apps/desktop/scripts/package-target.ts | S:GNU tar 在 Windows 盘符路径必须加 --force-local（否则 D: 被当远程主机）；--pack-destination 必须绝对路径，相对路径按包目录拼接
+prepare-dsh.ts[EV8M]: F:装配 dsh 运行时（vendored tarball 解析依赖树） | R:code:apps/desktop/scripts/package-target.ts | A:出包链 | S:DesktopRelease.version 取上游 dsh 版本；壳版本不匹配只 warn 不抛（三处版本解耦之一）
+desktop-build-version-discovery.ts[OV8S]: F:构建版本序号建议 | R:code:apps/desktop/scripts/desktop-cos.ts | A:打包流程 | S:版本形如 <product>.<YYYYMMDD>.<index>；索引优先问 COS bucket（跨机器唯一），列表未在 8s 内完整返回则回退本地 artifacts——拿部分清单编号可能撞已发布索引使 feed 校验和失效；artifact 名正则同时匹配 signed/unsigned（-unsigned 后缀）；日期段用构建主机本地时区。
+desktop-cos.ts[IN8S]: F:腾讯 COS 客户端工厂 | R:code:apps/desktop/scripts/desktop-upload-run.ts | A:upload-target/qualification | S:region 硬编码 ap-beijing；ChunkRetryTimes=0、重定向/换主机/时钟纠偏全关+流式 Body+Content-MD5——SDK 只在 body 非流时重试，写永不被 SDK 重复发送；before-send 删 SDK 注入的空 Cache-Control；默认 900s 不活跃超时。
+desktop-release-tag.ts[OV8S]: F:生产发布 git tag 记录 | R:code:apps/desktop/scripts/upload-target.ts | A:upload-target | S:tag=desktop-v<version>（区别 npm 家族 dsh-v*）；只在上传成功后打 tag（没发出去的 release 打 tag 更糟）；本地已有同名 tag 时校验其 commit 一致才 push，不一致报 failed 不覆盖；tagging 失败只报告不使上传失败，并输出按进度裁剪的 recovery 命令序列。
+desktop-toolchain-preflight.ts[OQ8S]: F:打包外部工具链探针 | R:- | A:打包流程 | S:tar 探针必须在归档所在目录内以 basename 运行（GNU tar 把 Windows 绝对路径的冒号当远程主机分隔符）；win32 额外探 vswhere+VC++ 工具集（安装器辅助要编译）；每个探针验证脚本依赖的具体行为而非仅可执行性，失败聚合一次报全。
+desktop-upload-plan.ts[OV8M]: F:上传前产物校验与计划 | R:code:apps/desktop/scripts/desktop-upload-run.ts | A:upload-target | S:根与 desktop 版本必须一致；包完成记录里的版本须校验为当前 dsh 版本的合法构建；nightly.yml 的 url/size/sha512 与本地安装器逐字节复核；--latest 改推固定 dsh-latest 键（覆盖旧对象）；非 prerelease 额外产 latest.yaml；channel 元数据恒排最后。
+desktop-upload-run.ts[OV8S]: F:带证据的 COS 上传执行 | R:code:apps/desktop/scripts/desktop-upload-plan.ts | A:upload-target | S:每个 PUT 前后写 events.jsonl 与 plan.json（含 uploader 源文件哈希指纹）；PUT 前重哈希输入防变化；流式 PUT+Content-MD5 使 SDK 重试路径不可达且本函数不重试——同一 key 的确认 PUT 唯一；失败停止后续 PUT；result.json 恒 wx 落盘；证据目录在 .desktop-build/upload-records。
+dev.ts[XV7S]: F:未打包壳开发启动器 | R:code:apps/desktop/scripts/development-project.ts | A:pnpm run dev:desktop | S:必须经 pnpm 脚本调用（依赖 npm_execpath）；调试口 9229/9222/9230 可 env 覆盖；nodeVersion 用 ELECTRON_RUN_AS_NODE 跑 electron 探测；darwin 走生成的 .app；
+development-app.ts[XV8S]: F:macOS 开发 .app 组装 | R:code:apps/desktop/scripts/dev.ts | A:dev.ts(darwin) | S:从 electron 包 ditto 出 Harness Dev.app，bundle id=com.deepseek.harness.dev.<sha256(appRoot) 前12>；可执行文件是生成的 sh launcher；stamp 未变复用不重建；每次 lsregister；ad-hoc codesign；仅 macOS。
+development-project.ts[XV8S]: F:开发用一次性项目物化 | R:code:apps/desktop/src/project-manager.ts | A:dev.ts/test 脚本 | S:严格校验 apps/cli 与 apps/desktop-host 的包名版本=release，host 产物必须已构建；node_modules 镜像 pnpm 虚拟提升目录并递归跟随 workspace: 依赖（缺失报错）；win32 用 junction；desktop-runtime.json 的 files 留空。
+flock-entry.ts[XR8T]: F:flock 插件惰性构建加载器 | R:code:native/system | A:macos-notarization-proxy | S:打包脚本首用 flock 时若 native/system 未构建会自动跑 pnpm run build:native-system && build:ts——必须已在 pnpm 脚本内（需 npm_execpath）；构建探测仅 darwin/linux（其他平台视为已构建，flock 自身会拒）；memoized loader 失败后下次调用重试。
+installed-update-builder.ts[OV8S]: F:资格打包 builder 配置 | R:code:apps/desktop/scripts/electron-builder-config.mjs | A:installed-update-packaging | S:环境必须 test、非 unsigned、ORIGIN/BUCKET 与 run.json 一致否则拒绝；包名改 dsh-update-test-<runId>、入口 qualification-bootstrap.mjs；files 只收 lib/renderer/bootstrap 白名单；输出进 run.root/<version>/installer。
+installed-update-cos.ts[IV8S]: F:固定测试 COS 传输 | R:code:apps/desktop/scripts/installed-update-publication.ts | A:publish-installed-update | S:测试桶与域名硬编码，凭据仅从 .env.windows 注入；key 限 qualification/<24hex>/win-x64 白名单；versioningDisabled 要求 200 且无 Status（版本化关停才许不可变上传）；put 带 forbid-overwrite；读写 15 分钟/查询 30 秒总死线。
+installed-update-distribution.ts[FV8S]: F:资格产物本地校验与分发计划 | R:code:apps/desktop/scripts/installed-update-qualification.ts | A:publication/packaging | S:只做本地完整性：安装器尺寸/sha512 必须与构建产 nightly.yml 一致且文件名固定格式；feed 重新 dump 规范化（url 换绝对地址）而非复用 builder YAML；显式标 file-integrity-only、publicationAuthorized:false——完整性不等于签名/发布授权。
+installed-update-package-content.ts[OQ7S]: F:安装包载荷内容核验 | R:code:app-builder-lib asar | A:verify-installed-update-package | S:从实际安装包抽取的 ASAR 验证（不信旁边的 unpacked 构建）；逐文件哈希对冻结清单，package.json 按 builder transformer 产物重算；.exe 必须在 ASAR 外；
+installed-update-packaging.ts[OV8S]: F:受监督的单版本资格打包 | R:code:apps/desktop/scripts/package-installed-update.ts | A:package-installed-update | S:签名互锁文件存在即拒（管理员审核恢复，禁自动重试/清除）；check 模式不启子进程；execute 需 win x64 加逐字确认短语；输入哈希（源+脚本+证书+signtool）打包前后两次比对，变化即停；PIN 只从 .env.windows 读且短暂进 SignTool 参数。
+installed-update-publication.ts[OW7M]: F:分阶段发布编排 | R:code:apps/desktop/scripts/installed-update-cos.ts | A:publish-installed-update | S:上传与发布是两个独立授权动作；publish 前必须复用成功 upload 回执（全字段哈希比对）；二进制 forbid-overwrite，successor feed 可覆盖但需原版启动证据；
+installed-update-qualification.ts[TQ8M]: F:资格运行分配与日志检验 | R:code:apps/desktop/src/update-journal.ts | A:全部 installed-update 脚本 | S:run.json 读取硬校验 root=manifest 目录、origin/bucket/appId/feedKey 全由 id 派生（防篡改重定位）；版本须测试格式且严格递增；journal 单文件≤10MiB 总量≤50MiB、末尾须换行、sequence 连续且 0 号必为 started；不完整流程退出码 2。
+macos-cache-policy.ts[OV8T]: F:签名缓存复用策略 | R:code:apps/desktop/scripts/macos-signature-cache.ts | A:macos-runtime | S:策略键=证书 sha256+identifier+签名环境+entitlements+工具文件哈希+os.release()，凭据绝不入键；只缓存 thin Mach-O（魔数四选一）；verify 用 codesign --strict 并重抽证书/entitlements 深比对；probe 必须来自本次临时 keychain 签名。
+macos-notarization-proxy.ts[OR7M]: F:公证期系统代理托管与恢复 | R:code:apps/desktop/scripts/flock-entry.ts | A:公证打包流程 | S:改系统代理前先记录 original.json（含 pid）；flock 排他且锁 inode 不 unlink（unlink 会产生两把独立锁）；要求 PAC/发现/SOCKS 全关否则拒绝，认证代理不支持；
+macos-runtime.ts[OV8S]: F:运行时 Mach-O 逐一签名 | R:code:apps/desktop/scripts/macos-signature-cache.ts | A:打包流程 | S:按 Mach-O 魔数筛选签名对象；node 与 libreoffice-kit 需 JIT entitlements（node-x64 专用 plist）；identifier=appId.runtime.sha256(path)；4 并发失败聚合等全部 signer 结束；缓存模式需 probe 且只缓存 thin 文件。
+macos-signature-cache.ts[OV8S]: F:内容寻址签名缓存 | R:code:apps/desktop/scripts/macos-cache-policy.ts | A:macos-runtime | S:cache key=sha256({schema,input,mode,policy}) 含文件权限位；先签到源目录旁 .dsh-sign-* 临时副本，验证期间输入内容/mode 变化即放弃；缓存写入走 .pending-* 暂存+rename，ENOTEMPTY/EEXIST 竞态改为验证赢家条目；prune 按最新保留 1GiB 内，驱逐竞态下读者 fail closed。
+package-macos.ts[OV8M]: F:macOS ZIP/DMG 双通道公证 | R:code:apps/desktop/scripts/notarize-macos.mjs | A:打包流程 | S:ZIP 与 DMG 从两份独立副本并行公证（双通道都结算）；ZIP 含 stapled App，DMG 自带票据其内 App 不单独 staple；appPath 固定 builder 输出名而非品牌名；secrets 按正则过滤后传 packagingStep。
+prepare-cli.ts[OV8T]: F:CLI 启动脚本拷贝 | R:code:apps/desktop/cli | A:prepare-runtime | S:仅拷贝 cli/bin 下的 dsh（darwin）或 dsh.cmd（win32）到 runtime/cli/bin 并 mkdir；darwin chmod 0755；静态资源拷贝而非生成。
+prepare-command-link.ts[OV8T]: F:macOS link-entry 助手编译 | R:code:apps/desktop/cli/link-entry.c | A:prepare-runtime | S:clang -std=c11 -O2 -Werror 编译 cli/link-entry.c 成 runtime/cli/link-entry（保 symlink 身份的 linkat 助手）；arch 显式传参与构建主机无关；-mmacosx-version-min 取自 Electron Info.plist 的 LSMinimumSystemVersion；仅 macOS 主机可执行。
+prepare-installed-update-application.ts[FQ8T]: F:应用文件冻结与复验 | R:code:apps/desktop/scripts/installed-update-qualification.ts | A:builder/verify | S:只收 lib/*.js|cjs+renderer/**+两个 bootstrap 模块，强制包含 main.js 与三个 preload cjs（缺=提示先重建）；先写后复读双哈希比对防冻结中变化；result.json 标 dependenciesFrozen:false/signed:false；verify 阶段拒绝路径含反斜杠/盘符/..段并要求清单无多无少。
+prepare-installed-update-bootstrap.ts[FV8T]: F:资格启动模块生成 | R:code:apps/desktop/scripts/installed-update-qualification.ts | A:prepare-installed-update-application | S:bootstrap/ 目录用 mkdir（已存在即失败）防复用；qualification-bootstrap.mjs 内联 run id/versions JSON，运行时读 app 的 package.json 调 configureInstalledUpdateIdentity 后动态 import lib/main.js；两个模块必须进每个版本的 builder files 白名单。
+prepare-installed-update-network.ts[FQ8T]: F:防火墙故障注入计划 | R:code:apps/desktop/scripts/installed-update-signature.mjs | A:操作员 | S:只生成 plan.json 不动防火墙；executable 必须 realpath 在 run.root 内且哈希=version1 回执签名 sha512；receipt 必须位于 verification/check-*/result.json 相对路径；规则名含 runId。
+prepare-installed-update-runtime.ts[FV8S]: F:运行时克隆为两个测试版本 | R:code:apps/desktop/src/runtime-tree.ts | A:prepare-installed-update | S:源 runtime 先验证；逐份 cp 后改写 package.json 版本（含 dsh* 精确依赖）再重封清单并复验；结束复核源 descriptor 哈希未变；run.source.version 可与壳版本不同。
+prepare-installed-update.ts[OV8T]: F:资格材料 CLI | R:code:apps/desktop/scripts/installed-update-qualification.ts | A:操作员 | S:子命令 init/bootstrap/runtime/application/files/collect/inspect 参数个数严格；init 记录 git HEAD 加 dirtyFiles；runtime 源固定 win-x64 targets 目录；inspect 不完整流程 exitCode=2；catch 不回显异常细节。
+prepare-primary-runtime.ts[OV8S]: F:主运行时准备适配层 | R:code:scripts/primary-runtime/prepare.ts | A:prepare-runtime/dev | S:复用根 scripts/primary-runtime/prepare.ts，输出在 targets/<target>/runtime；smoke 前用 scrubWindowsSigningEnvironment 剥签名环境变量；deferSmoke 供 Windows 签名后延迟执行；smoke 校验 payload 必须声明 node+pnpm 组件且 Python 版本非空。
+prepare-runtime-manifests.ts[OV8T]: F:builder manifest 预变换 | R:code:app-builder-lib fileTransformer | A:打包流程 | S:调 app-builder-lib 内部 createTransformer 把 electron-builder 将来写入归档的 package.json 改写提前落盘，保证 runtime 完整性清单与包内字节一致；内部模块无类型，经 createRequire 加载；对 node_modules 递归内所有 package.json 生效。
+prepare-runtime.ts[OV8S]: F:Electron/pnpm/CLI 运行时准备 | R:code:apps/desktop/scripts/prepare-primary-runtime.ts | A:打包流程 | S:用 @electron/get 下载目标平台 electron；nodeVersion 从该 electron 以 RUN_AS_NODE 探测（非构建主机 node）；darwin 用 PlistBuddy 读最低系统版本供 link-entry 编译；每次整体 rm runtime root 重建。
+publish-installed-update.ts[OV8T]: F:资格发布 CLI | R:code:apps/desktop/scripts/installed-update-publication.ts | A:操作员 | S:upload-binaries/publish-feed 与 --execute 分离，默认仅本地校验；执行需 TTY 确认短语 UPLOAD/PUBLISH <version> <runId>；publish successor 版本必须提供 journals 目录并确认版本1已装且启动过；中文操作提示；失败不自动重试。
+render-tray-icon.ts[OV8S]: F:托盘多尺寸 ICO 生成 | R:code:apps/desktop/resources/icon-windows.svg | A:tray.ts | S:从 SVG 按 7 档尺寸（16..64 对应 100%~400% DPI）分别光栅化而非缩放大图；SVG 必须含 tray-glyph 组并注入 1.2 倍放大变换；产出 committed 的 tray-windows.ico，改 SVG 后需重跑渲染命令；ICO 条目 PNG 压缩、256 边长编码为 0。
+runtime-file-policy.ts[FV8T]: F:运行时文件剔除策略 | R:code:apps/desktop/src/runtime-tree.ts | A:运行时物化脚本 | S:纯函数决定 node_modules 拷贝剔除项：.bin/.pnpm 元数据、source map、.d.ts、tsbuildinfo；libreoffice-kit 只留 officeEngine 选中的平台包；node-pty prebuilds 只留目标平台且剔 .pdb；koffi 剔 .lib；未识别资产一律保留（策略保守，识别不到不删）。
+sign-primary-runtime.ts[OV8T]: F:Windows 运行时签名阶段 | R:code:apps/desktop/scripts/windows-sign.mjs | A:打包流程 | S:需受监督 run dir+证书文件；签名缓存 identity 由证书/signtool/脚本 realpath 哈希构成；--dsh 阶段签完必须 writeDesktopRuntime 重封（签名改字节）再 verify+smoke；失败 failPackagingRun 记 fatal；结尾输出 SIGNATURE_CACHE_SUMMARY。
+smoke-packaged-runtime.ts[TQ8T]: F:最终组装产物冒烟 | R:code:apps/desktop/scripts/smoke-prepared-runtime.ts | A:打包验收 | S:校验最终产物：verifyDesktopRuntime+win 非 unsigned 时 verifyWindowsCode 签名检查；--unsigned 仅 Windows 支持；mac 路径是 橙子PRO.app/Contents（win 是 win-unpacked）；随后 smokePreparedRuntime 检 app.asar/dsh 与外置 runtime。
+smoke-prepared-runtime.ts[TQ8T]: F:准备期运行时冒烟 | R:code:apps/desktop/scripts/smoke-runtime.ts | A:打包/签名阶段 | S:NARB_NATIVE_CACHE_DIR 指到一次性 tmp（防污染用户缓存）、NODE_OPTIONS 清空；有归档时先 verifyRuntimeArchive 再跑 runtime-payload-smoke fixture（120s）+smokeDesktopRuntime；env 经 desktopNodeEnvironment 注入私有 node bin 并 scrub 签名变量。
+smoke-runtime.ts[TQ8S]: F:Host 启动与 Office 转换冒烟 | R:code:apps/desktop/src/host-process.ts | A:打包验收 | S:在一次性私有 home 启动真 Host（绝不碰用户 profile）；注入临时 cordis 插件验证同实例并用 skill CLI 真转 docx/xlsx/pptx 为 PDF（验 PDF 头尾、PATH 置空）；端口 0 随机；Host 就绪 120s 超时，finally 停 Host 删 home。
+test-host-updates.ts[TQ8T]: F:Host 任务保护资格测试 | R:code:apps/desktop/tests/fixtures | A:资格流程 | S:不经 Electron 直接跑资格 fixture；patch 禁用 llm/telemetry 等插件；子进程 env 只留 path/systemroot/windir/comspec/pathext（防宿主泄漏），HOME/TEMP 指私有 root；直接 junction .pnpm/node_modules 保留现有依赖图；120s 超时。
+test-workspace-updates.ts[TQ8T]: F:Electron 工作区更新资格测试 | R:code:apps/desktop/tests/fixtures | A:资格流程 | S:组装最小 app 加 junction 依赖；更新令牌用 randomUUID；GUI 子进程禁止 windowsHide（隐藏会抑制首窗并挂起渲染帧回调）；--interactive 跳过 120s 超时。
+upload-target.ts[OV8M]: F:发布上传 CLI | R:code:apps/desktop/scripts/desktop-upload-plan.ts | A:发布操作员 | S:目标限定 mac-arm64/mac-x64/win-x64；--credential-launcher 模式要求显式 --environment/--bucket 且必须与打包记录的部署一致（防凭据错桶）；仅生产上传且非 --latest 才打 desktop-v tag；dirty 工作树不打 tag（tag 指向的树≠用户收到的）；凭据环境变量必须非空。
+verify-installed-update-package.ts[TQ8S]: F:签名安装包核验 | R:code:apps/desktop/scripts/installed-update-package-content.ts | A:资格流程 | S:用受审核的本地 7-Zip（绝不执行安装包内提取的 exe）；列表拒绝 symlink/hard link/reparse、大小写重复路径、保留设备名（CON/NUL/COM1..LPT1..）、尾点尾空格段与控制字符；签名验证（安装器+主 exe+全部重签 runtime exe）+逐文件哈希+末尾 unchanged-inputs 复核；从不安装，失败保留 check-* 记录。
+verify-runtime-archive.ts[TQ8S]: F:ASAR 内运行时完整性验证 | R:code:app-builder-lib asar | A:smoke 脚本 | S:对比 ASAR 内 dsh 树与封存清单：desktop-runtime.json 必须与 preparation 字节一致；unpacked 文件用物理 lstat mode 判可执行（ASAR 只存 owner-execute 位，group/other-only 可执行文件会比对失败）；拒绝 ASAR link 节点与未预期的 .unpacked 条目。
+windows-signing-preflight.ts[OQ8T]: F:Windows 签名预检 | R:code:apps/desktop/scripts/windows-sign.mjs | A:打包流程 | S:编译一个从未执行的 C# 探针（.NET Framework csc.exe 路径硬编码 Framework64/v4.0.30319）再签名验证 thumbprint+时间戳；fatal.json 或签名互锁存在即拒绝且无自动恢复；证书必须当前在有效期；时间戳尝试永不重复硬件签名；探针记录 probeExecuted:false；要求受监督 run dir。
+cos-operation.ts[OR8T]: F:COS 操作总死线包装 | R:code:apps/desktop/scripts/desktop-cos.ts | A:installed-update-cos | S:经 before-send 注入包装后的 http/https 模块，SDK 内部重试也走同一 AbortController；超时 abort 后等待全部 request close 才返回；超时错误 name 改写为 'TimeoutError' 供上游按码识别；finally 二次 abort+摘 listener，client 必须单操作专用。
+package-installed-update.ts[OV8T]: F:资格打包 CLI | R:code:apps/desktop/scripts/installed-update-packaging.ts | A:操作员 | S:参数仅 manifest version [--check|--execute]；确认短语 PACKAGE <version> <runId> 逐字匹配且必须 TTY；交互提示明确要求：管理员已审核并恢复签名保护、已注销令牌、剩余 5/5、PIN 正确；PIN 只从 .env.windows 读；失败操作不重试；错误统一不回显异常细节。
+
+===D:/chengzi-pro/dsh-official/scripts/release/===
+families.ts[EV8M]: F:官方包家族定义与成员校验 | R:code:apps/desktop/scripts/prepare-package-set.ts | A:旁路 pack | S:excludedDirectories 含 packages/chengzi/ 让定制包绕过家族校验；新 chengzi 包出包进不了包先查这里
+bump.ts[OV8L]: F:发布家族版本提升与提交 | R:code:scripts/release/families.ts | A:发布操作员 | S:dsh 家族 root+成员+私有 manifests 一起改版本再 lockfile-only install 后 commit；vendored 每包独立版本但全体推进（防复用）；vendor 基线取 manifest 与最近 tag 较大者（re-sync 会回退），prerelease 不消耗号段；git version-sort 把 rc 排正式版之上故 semver 比较自实现。
+families.spec.ts[TQ8L]: F:发布家族契约测试 | R:code:scripts/release/families.ts | A:CI | S:断言 dsh 家族当前实验包全集名单——新增 experimental 包必须显式更新期望列表；fixture 用临时目录+writeClientBuildRecord 模拟构建环境并逐一清理。
+installed-product-isolation.ts[FQ8T]: F:默认产品实验包隔离检查 | R:code:packages/boot/app-boot/src/profile.ts | A:verify-packed-install | S:从入口包 BFS 已安装依赖图（dependencies/optionalDependencies/peerDependencies），任何路径出现 @deepseek-ai/dsh-experimental-* 即拒绝；入口包自带关闭的 optional bundles 必须实际安装（在旁边而非依赖里）；npm: 别名目标也查实验名；devDependencies 与邻接安装不参与图。
+installed-product-isolation.spec.ts[TQ8T]: F:产品隔离测试 | R:code:scripts/release/installed-product-isolation.ts | A:CI | S:临时 node_modules fixture 验证：dev 依赖豁免、三种 section 的传递实验依赖拒绝、alias 后实验名仍被拒、入口 optional bundle 缺失报错。
+pack.ts[OV8T]: F:发布家族整体打包 | R:code:scripts/release/tarball.ts | A:发布流水线 | S:按 publishOrder 打包但顺序数组按成员序写（不按完成序）；--concurrency 默认 1（与发布工作流一致）；输出目录先 rm 再建；写 publish-order.txt；pack 前先验构建产物与版本基线；npm pack 无凭据可重跑。
+process.spec.ts[TQ8T]: F:发布助手测试 | R:code:scripts/release/process.ts | A:CI | S:真 tar 打包 fixture 验证 Windows 盘符路径必须以 cwd=归档目录+basename 规避（GNU tar 冒号=远程主机）；验证 pnpmCommand 在本机实际可执行并返回版本号。
+publish.ts[OV8M]: F:幂等 npm 发布 | R:code:scripts/release/tarball.ts | A:发布流水线(GitHub Actions) | S:逐包问 registry：缺→发布、integrity 相同→跳过、不同→失败（内容变了版本没变）；瞬态码 E409/E429/E5xx/网络类重试 4 次，E403 已存在版本类不重试；发布间隔 2s 防 packument 写竞争（E409 主因）；仅从 family tag 发布且分包发布到 per-version dist-tag channel。
+publish.spec.ts[TQ8M]: F:发布行为测试 | R:code:scripts/release/publish.ts | A:CI | S:mock attempt 层验证 dist-tag channel 命名（如 dsh-0-2-1-alpha-1）、E409 重试、integrity 冲突失败、同 integrity 跳过；定时器 mock 后不真正 sleep。
+tarball.ts[XZ8T]: F:tarball 读取助手 | R:code:scripts/release/publish.ts | A:pack/verify-packed-install | S:tar -tzf/-xOzf 一律 cwd=归档目录+basename（Windows 盘符冒号问题）；PUBLISH_ORDER_FILE=publish-order.txt 决定上传顺序；packedIdentity 读 package/package.json 的 name/version 并校验为字符串。
+verify.ts[OQ8S]: F:发布门校验 | R:code:scripts/release/families.ts | A:CI 工作流 | S:RELEASE_PUBLISH==='true' 时强校验 GITHUB_REF 必须是 refs/tags/<familyPrefix>* 且该 tag 恰好命名某成员当前版本；publishOrder 在构建前解析（依赖环尽早失败）；npm 拒发 private 包需提前摘除；每次 PR 都打印 publish order 供评审（顺序变更可评审而非只在上传时暴露）。
+verify-packed-install.ts[TQ8S]: F:打包产物安装冒烟 | R:code:scripts/release/installed-product-isolation.ts | A:CI | S:临时消费者全 file: 依赖 npm install（--omit=optional：Landlock 包需 musl 工具链）；env 删 NODE_OPTIONS/NODE_PATH/npm_config_user_agent 并设私有 DSH_HOME 加关遥测；跨序列 peer 由额外 --from 目录供给（registry 可能无匹配版本）；验证版本号并跑产品隔离检查。
+process.ts[XZ8S]: F:发布命令执行助手 | R:code:scripts/release/publish.ts | A:全部 release 脚本 | S:pnpmCommand() 返回 node+pnpm.cjs 而非裸 'pnpm'——Windows spawnSync 无法执行 .cmd shim；npm_execpath 若是 pnpm 的 js 入口则直接复用（npm/yarn run 也设它，正则校验防错用）；isEntry 用 realpath 比对；capture 非 0 退出抛出含 stdout/stderr 全文的错误。
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/image/src/===
+index.ts[EE8T]: F:chengzi-image 插件入口：注册 generate_image 工具 | R:code:packages/chengzi/image/src/tool.ts | A:cordis 装配 | S:inject=['tools','userQuestions','credentials']；config 缺省需给默认值（apply 签名带 config 默认对象），否则禁用态装不上
+tool.ts[EE9M]: F:generate_image 工具：中转站生图（GPT-Image-2 标准/4K）确认卡+计费说明+present 交付 | R:code:packages/chengzi/image/src/index.ts | A:code:packages/chengzi/image/src/index.ts | S:defineTool 的 output.schema 每个 property 内标 required:true，外层不写 required 数组；双 schema DSL 写错位置静默不校验
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/account/src/===
+index.ts[EE9M]: F:chengzi-account 插件：登录/充值/平台 provider 目录同步/默认模型打通 | R:code:packages/chengzi/account/src/bff-client.ts | A:cordis 装配 | S:是登录门与模型目录的数据源；禁用它=客户端退回无账号状态
+bff-client.ts[EI9L]: F:BFF 出站客户端：全部 /chengzi-api 调用的统一入口 | R:code:packages/chengzi/account/src/index.ts | A:code:packages/chengzi/account | S:CHENGZI_BFF_BASE_URL 编译期常量=https://pro.nat6.net/chengzi-api，env 同名可覆盖（本地联调指 127.0.0.1:8080）；出站必须走它做 host 校验，勿自起 fetch
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/experts/src/===
+builtin-experts.ts[EU9M]: F:五个内置专家 persona+工具/技能绑定（含 PPT 专家四阶段确认门） | R:code:packages/chengzi/experts/src/index.ts | A:专家面板 | S:PPT 专家在《结构规划单》未经用户确认前禁止调用 generate_hzcfjt_ppt；技能包 hzcfjt-report-kit 内容在 BFF 云端（GET /api/v1/skill-packages）不在本仓
+index.ts[EE8T]: F:chengzi-experts 插件入口：专家注册表+面板路由+技能包同步 | R:code:packages/chengzi/experts/src/builtin-experts.ts | A:cordis 装配 | S:expert persona 经 preset-composition 读 effective standard 换入系统提示（0.2 无 .agent-presets 文件扫描）
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/aoci/src/===
+tool.ts[EI9M]: F:aoci 工具：白名单子命令包装 aoci CLI 于会话工作区执行 | R:code:packages/chengzi/aoci/src/index.ts | A:code:packages/chengzi/aoci/src/index.ts | S:sanitizeForwardedArgs 强制剥离 --repo/--repo=（含裸旗标后续值）——索引锁定会话工作区所属仓库，防多项目串仓；未装返回 not-installed+安装引导
+index.ts[EE8T]: F:chengzi-aoci 插件入口：aoci 工具+「仓库认知优先」systemPrompt section | R:code:packages/chengzi/aoci/src/tool.ts | A:cordis 装配 | S:section order=PLAN_POLICY-10；不挂全局 MCP 行（aoci per-repo 绑定与全局单实例 cwd 不匹配），原生工具以会话 cwd 达成项目隔离
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/brand/src/===
+index.ts[EU8T]: F:brand 插件 node 半体（空 apply 占位，浏览器半体走 exports./client） | R:code:packages/chengzi/brand/src/client | A:cordis Loader | S:host 侧行靠空 apply 注册；真正的品牌 mark/name 注入在 client 半体 brand 槽 priority -1 遮蔽官方 no-op
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/hzcfjt/src/===
+tool.ts[EE9L]: F:generate_hzcfjt_ppt：海珠城发五章节汇报 PPT 生成（含配图联动 generate_image） | R:code:packages/chengzi/hzcfjt/src/template/haizhu.ts | A:专家面板 PPT 专家 | S:前 6 页（封面+一、整体概况）锁定客户审定原版逐字节一致——传入的 cover/整体概况章节页被自动丢弃，slides 从「二、产业投资」开始
+index.ts[EE8T]: F:chengzi-hzcfjt 插件入口：注册 generate_hzcfjt_ppt | R:code:packages/chengzi/hzcfjt/src/tool.ts | A:cordis 装配 | S:模板头 assets/hzcfjt-head.pptx 由 import.meta.url 逐级向上 8 层封顶走查定位（tsdown 单文件 bundle 后目录层数与源码不同）
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/hzcfjt/src/pptx/===
+writer.ts[ED9L]: F:纯 TS OOXML 写入器：模板头+动态页渲染成 .pptx | R:code:packages/chengzi/hzcfjt/src/pptx/zip.ts | A:code:packages/chengzi/hzcfjt/src/tool.ts | S:slide rels 的 r:id 必须与 presentation 部件引用一一配对（历史踩坑点）；图片经 p:pic/media 部件嵌入
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/hzcfjt/src/template/===
+haizhu.ts[ED8M]: F:客户模板事实源：页面类型白名单+validateSlides 校验+五章节骨架 | R:code:packages/chengzi/hzcfjt/src/tool.ts | A:code:packages/chengzi/hzcfjt/src/tool.ts | S:页面类型白名单 cover/section/bullets/stats/table/company/project/image/timeline/end；越界类型整批校验失败
+
+===D:/chengzi-pro/dsh-official/packages/chengzi/aoci/===
+package.json[FV7T]: F:chengzi 定制包清单样板：dsh-plugin-chengzi-* 命名+workspace 协议依赖 | R:code:packages/bundle/web-app/package.json | A:pnpm workspace | S:包名必须保持 dsh-plugin-chengzi-* 前缀；进包三件套=web-app 依赖行+chengzi.patch.yml 行+tsconfig.host.json references
+
+===D:/chengzi-pro/dsh-official/packages/core/tools/src/===
+index.ts[EC9L]: F:工具运行时与 defineTool/ToolDefinition 契约中枢 | R:code:packages/core/tools/src/schema.ts | A:全部工具类插件 | S:defineTool 双 schema DSL：parameters/output 的 required 标在 properties 每项内；execute 签名 (args, exec) 带 agent/session 上下文
+schema.ts[CG9L]: F:双 schema 解析与校验（参数/输出/枚举白名单三面） | R:code:packages/core/tools/src/index.ts | A:code:packages/core/tools | S:required 写在外层数组不报错、静默不校验；工具形参异常先查此文件与 index.ts 的 DSL 契约
+json-schema.ts[KQ8L]: F:强制子集 JSON Schema 校验器（工具输出/PTC/子代理共用） | R:code:packages/core/tools/src/schema.ts | A:code:packages/core/tools/src/py-types.ts | S:不支持或放错位置的关键字是拒绝而非静默忽略；violations 收集全部违规路径而非首错即停；default/examples 是注解但仍要求无损 JSON；需要对象根的消费方必须先过 assertObjectJsonSchema；内建原型检查防跨 realm 伪造的 Array/Object。
+ptc.ts[DE8L]: F:PTC 模式 run_code 工具：嵌套调度、语言 flavor 与结果策展 | R:code:packages/core/tools/src/index.ts | A:code:packages/core/tools/src/index.ts | S:run_code schema 的语言 flavor 在 schema 发射时按已挂 runtime 解析——无 runtime 降级 TS flavor（仅 doc-catalog 读取可达，不喂模型），未知语言响亮失败；flavor 表查键用 Object.hasOwn 防 toString/constructor 原型成员冒充；
+presentation.ts[FU7M]: F:工具调用/结果 UI 呈现意图词表（card 联合类型） | R:code:packages/core/tools/src/types.ts | A:人类可读名：UI 桥与工具插件 | S:search 结果卡用 shape 而非 kind 作判别，避免与调用卡的 ToolCallKind（选图标用）撞名；
+py-types.ts[KE7L]: F:PTC Python 版 SDK 文本生成（TypedDict + Tools 协议） | R:code:packages/core/tools/src/ts-types.ts | A:code:packages/core/tools/src/ptc.ts | S:裸标识符判定比 str.isidentifier() 更严：另要求 NFKC 稳定（'ﬁeld' 编译期归一成 field 而 JSON 键按字面比较）；
+ts-types.ts[KE7M]: F:PTC TypeScript 版 SDK 文本生成（declare const tools） | R:code:packages/core/tools/src/py-types.ts | A:code:packages/core/tools/src/ptc.ts | S:非法标识符的属性名 JSON.stringify 引号化（无别名，名称全可达）；JSDoc 折叠为单行并转义 */ 防止 schema description 提前终止生成注释；
+types.ts[FD6T]: F:PTC 子派发两个 log-only 会话事件的词表 | R:code:packages/core/tools/src/ptc.ts | A:人类可读名：UI 桥与持久化层 | S:arguments 在派发前已 JSON 归一化，append 不会因载荷形状失败；start 在调度器真正启动调用时才记（队列中放弃的调用不记）；
+
+===D:/chengzi-pro/dsh-official/packages/core/agent/src/===
+index.ts[EB9L]: F:Agent 编排核心：会话循环/工具调度/维护任务 | R:code:packages/core/agent/src/dispatch.ts | A:apps/desktop 装配 | S:cordis Service 被 tracked proxy 包裹——测试 stub 用公共字段勿用 #private
+model-selection.ts[EC8S]: F:默认模型选择：平台钦定→首个免费→首个回退链 | R:code:packages/core/agent/src/index.ts | A:会话创建 | S:钦定模型不在目录则回退，目录里有但渠道缺失不触发回退（会话会失败）
+dispatch.ts[RM8S]: F:融合 agent 主体与 scope 载体的事件分发器（emit/serial/waterfall） | R:code:packages/core/agent/src/types.ts | A:code:packages/core/agent-loop/src/agent.ts | S:emit 不走 Cordis 原生路径而是自行解析回调集并逐监听器包含同步 throw 与 promise 拒绝（原生 emit 一个同步抛出会饿死后续监听器）；payload 展开在先、agent 注入在后，调用方传入的 agent 字段永远被注入值覆盖；waterfall 的 rest 尾元素就是最内层 next 回调。
+consumed-work.ts[DA7S]: F:折叠 agent 日志得出已消费工作的记账（消费 turn+未跑丢弃） | R:code:packages/core/agent-loop/src/inbox.ts | A:人类可读名：会话历史/存档消费方 | S:单看 turn/end 无法区分消费完成与空转，必须结合 inbox splice 的 removedCount 与 outcome:'canceled'；仅 completed 结尾不算账，blocked/aborted/interrupted/error 都算（pre-step 拒绝会丢弃已认领消息）；
+projection.ts[FD5T]: F:声明 turnBoundary 会话投影键的模块扩充 | R:code:packages/core/agent-loop/src/index.ts | A:code:packages/core/agent/src/types.ts | S:纯 declaration-merging 文件、无运行时代码；turnBoundary 键实际由 dsh-agent-loop 注册，本文件缺席时读取方须把 stateOf 返回 undefined 当作'无 agent-loop 能力'而非损坏状态。
+runtime-types.ts[FM9M]: F:Agent 公共类型与 agent/* 全事件词表及扩展点契约 | R:code:packages/core/agent/src/types.ts | A:code:packages/core/agent-loop/src/index.ts | S:pre-step/request/request-error 是 waterfall 扩展点，不调用 next 即接管决策；turn-stopping 是 serial 且结果由数据（收件箱是否空）决定，监听器顺序无法改变结局；cancel 默认丢收件箱，keepInbox 保留排队工作且不记 canceled splice；
+types.ts[FD8S]: F:Agent 耐久词表：身份、收件箱目标、投影键与 splice 事件 | R:code:packages/core/agent/src/runtime-types.ts | A:code:packages/core/agent-loop/src/inbox.ts | S:'agent/inbox/spliced' 的 outcome:'canceled' 是判定'工作被丢未跑'的唯一凭据；InboxWireState 用 JsonValue 形态是因 UserMessage 完整联合携带 unknown replay 字段无法跨 typert Remote 边界；turnBoundary 投影键由 dsh-agent-loop 注册，缺席=能力缺席而非损坏。
+archive-admission.ts[IW6T]: F:向 workspace 注册表安装 turn 存档准入与归档即取消 | R:code:packages/core/agent/src/types.ts | A:code:packages/core/agent/src/index.ts | S:归档取消走 agent.cancel({kind:'user'}) 但刻意不带 stop 按钮的 keepInbox——排队输入被丢弃并记 inbox splice，不会在归档后唤醒 Session；
+
+===D:/chengzi-pro/dsh-official/packages/core/system-prompt/src/===
+index.ts[EC9L]: F:系统提示装配与 section 注册面 | R:code:packages/core/agent | A:全部指令注入插件 | S:ctx.systemPrompt.section({name,order,text}) 是 0.2 指令注入正道；order 用 getSectionOrder('PLAN_POLICY') 相对值算锚点
+
+===D:/chengzi-pro/dsh-official/packages/core/agent-default-model/src/===
+index.ts[EC8S]: F:默认模型初值策略 | R:code:packages/core/agent/src/model-selection.ts | A:新会话 | S:chengzi.patch.yml 的 agent-default-model 钦定行与目录同步优先级联动，勿只改一处
+
+===D:/chengzi-pro/dsh-official/scripts/===
+agent-note-tree.ts[XQ7S]: F:上游 .agents/notes 结构校验脚本之一（根 scripts 校验面） | R:- | A:CI/根校验 | S:根 scripts 面是 layout/variants/vendored-runtime 校验所在；check:desktop-variants 强制 stable/beta 逐字节一致，v1 期 chengzi 只改 stable 该门必失败（已知约束）
+verify-npm-install-layout.ts[OQ8M]: F:双版本 npm 安装布局门 | R:code:scripts/benchmark-npm-resolution.ts | A:CI 质量门 | S:造两个不兼容 DSH 版本（0.1.0/0.2.0）+ dsh-previous alias 装 hoisted 布局验证 peer 放置；MAX_RESOLUTION_WORK_UNITS=875000（实测 699148+25% 余量），npm 解析成本≈包数×内部边数（参考机实测 180.7s）；提升预算必须重测并记录新计数；NPM_HANG_GUARD 由预算派生（4 倍慢机不影响判定）。
+verify-npm-install-layout.spec.ts[TQ8S]: F:安装布局门测试 | R:code:scripts/verify-npm-install-layout.ts | A:CI | S:fixture lockfileVersion 3；断言 peer 重放置正确性与解析工作预算的判定边界，不真跑 npm。
+check-workspace-constraints.ts[OQ8L]: F:workspace 包约束总门 | R:code:scripts/experimental-package-policy.ts | A:CI 质量门 | S:汇总多 gate：家族版本一致（root=成员）、protocol 范围、实验包隔离（目录加 npm 名双规则）、发布载荷禁文件、optional bundle patch 存在；vendored 包名单与发布仓库 URL 硬编码。
+check-workspace-constraints.spec.ts[TQ8L]: F:workspace 约束测试 | R:code:scripts/check-workspace-constraints.ts | A:CI | S:412 行 fixture 覆盖 manifest/protocol/实验隔离/project-reference-faces 等函数级契约，全部走临时目录不碰真实 workspace。
+repo-files.ts[XZ8M]: F:仓库文件遍历与引用扫描 | R:code:scripts/repo-files.spec.ts | A:多个 verify 门 | S:自研 glob walker：node fs.glob 24.x 部分版本对 symlink 文件 lstat 探测会抛 ENOTDIR；字面段可进 symlink 目录、通配段不进不匹配 dot；不支持字符类/花括号/extglob（显式抛错防静默缩 corpus）；归档 agent notes 豁免。
+repo-files.spec.ts[TQ8S]: F:walker 契约测试 | R:code:scripts/repo-files.ts | A:CI | S:钉住 symlink/dot/字面 vs 通配语义——walker 契约是本仓自定义而非 node 跨版本保证，改语义必须改这里。
+verify-package-paths.ts[XQ8S]: F:stale packages/ 引用门 | R:code:scripts/repo-files.ts | A:CI 质量门 | S:只在引用段命中真实包名（packages/<group>/<pkg> 目录名集合）时才报 drift——排除 typo 与提案中的假想包；排除 lib/ 构建产物、.d.ts、vendor/ 与归档 agent notes；globs/占位符字符终止匹配不探测。
+
+===D:/chengzi-pro/dsh-official/packages/core/agent-loop/src/===
+agent.ts[AW9L]: F:默认 Agent 驱动器：turn/step 循环、请求构建与中断结算 | R:code:packages/core/agent-loop/src/index.ts | A:code:packages/core/agent-loop/src/index.ts | S:max-tokens 结局是粘性的，后续正常完成的 step 不得把 turn 结局降级；首个 request/header 仅记一次，reason 按 initial/resume/change/series 区分；cancel 是循环信号唯一 abort 方，cause 需拷贝（Node fetch 会往 reason 上挂 stack 使 Session.append 无法存储）；
+assistant-stream.ts[DO7S]: F:单次模型尝试的流帧发布与耐久累积器 | R:code:packages/core/agent/src/runtime-types.ts | A:code:packages/core/agent-loop/src/agent.ts | S:settle 先同步提交耐久事件再发 end 帧，append 失败先 abandon 再 rethrow；attemptId 形如 sessionId:attempt，attempt 计数是 Attached-Session 本地、revision 同一 Agent 生命周期内单调且替换后从 1 重启；
+inbox.ts[PD8M]: F:耐久收件箱投影定义与 ReactLoopInbox 命令门面 | R:code:packages/core/agent/src/types.ts | A:code:packages/core/agent-loop/src/agent.ts | S:投影 apply 校验 splice 越界与跨两列表消息 id 重复，坏历史抛错拒绝恢复而非静默丢；claim 用 discardRemoved=false 故认领不产生 outcome:'canceled'，只有 cancel/clear 记；clear 固定先 next-step 后 next-turn（各一条 splice 事件）；send 经 start=Infinity 追加到尾部。
+index.ts[EW9L]: F:agent-loop 插件：Agent 工厂服务、声明式配置代理与有序 teardown | R:code:packages/core/agent-loop/src/agent.ts | A:宿主加载器与 ctx.agents 工厂消费方 | S:teardown 在注册表发布之前注册并 memoize，setup 中途 unload 可整体回滚；resume 先持写句柄排除并发 resume，再以 interruptedTurnClosers 做语义修复；appendUnstoredSuffix 按'存量+后缀长度'推进游标而非 session.seq，await 期间追加的事件留给下次 flush；
+constants.ts[FC4T]: F:agent-loop 默认并行工具调用上限常量 | R:- | A:code:packages/core/agent-loop/src/index.ts | S:值固定 10，是 maxParallelToolCalls 配置缺省时的回落值；
+runtime-context.ts[DD7S]: F:system 提示与运行时上下文两投影的提交决策（不执行提交） | R:code:packages/core/agent-loop/src/agent.ts | A:code:packages/core/agent-loop/src/agent.ts | S:第一个 prompt 即使为空也占据 surface node 0；不可 in-history 的路由会规范化首个 system 节点并清空后续非空 system 节点（休眠空尾不再重复替换）；
+tool-calls.ts[DW8M]: F:单步工具调用调度器：排他屏障、有界并行池与中断合成结果 | R:code:packages/core/tools/src/index.ts | A:code:packages/core/agent-loop/src/agent.ts | S:排他调用成屏障，并行组内每轮提交后重读 executionMode——注册表变化可让未开始的调用改判为新屏障；abort 给未启动调用记 TOOL_ABORTED_BEFORE_DISPATCH 合成错误结果保证 replay 合法；parseArguments 保留非法 JSON 原文为文本、空参映射 {}；
+
+===D:/chengzi-pro/dsh-official/packages/core/scope/src/===
+index.ts[CG9M]: F:scope 原语：打标上下文铸造与路由式事件载体 | R:code:packages/core/scope/src/store.ts | A:code:packages/core/agent-loop/src/agent.ts | S:scopeParents 单亲链同时驱动两方向：注册视图向下继承、事件准入向上扩展（祖先 scope 监听器收后代 scope 事件），tag 低于 dispatch key 的监听器被排除（事件只向上不向下）；bindScopeParent 仅原始绑定者可 rebind 且建环即抛；scopeTarget 保留 base 已有 Cordis filter。
+store.ts[CD7M]: F:作用域感知注册表的插入序存储与层叠效果所有权 | R:code:packages/core/scope/src/index.ts | A:人类可读名：tools/commands 等作用域注册表 | S:peek 故意链盲——取某 scope 自己的约束/守卫时不得静默继承祖先层，要继承用 chainLayers（最远祖先在前、就近 scope 最后覆盖）；
+
+===D:/chengzi-pro/dsh-official/packages/core/session/src/===
+index.ts[AD9L]: F:事件溯源会话服务：追加式日志、内存 store、派生消息历史与 fork | R:code:packages/core/session/src/types.ts | A:dsh-agent-loop、session-persistence、session-query | S:append 返回的 event.data 是入日志的深快照而非调用方原对象；seq=log.length 强制从 0 连续，坏 seed 在构造期即拒；append 进行中禁止重入；session/created 同步 throw 会否决发布并触发配对 disposal，异步拒绝仅记日志；snapshotEvents、eventAt、ownEvents 已弃用禁止新调用。
+preparation.ts[CD6T]: F:未发布 Session 的所有权封装与 provider 释放回调 | R:code:packages/core/session/src/index.ts | A:agent 工厂的 prepare/enter/announce 事务 | S:dispose 同步且幂等（released 标志）；发布路径可能提前消费 provider 状态使 release 变成 no-op 而非报错，提供者必须容忍；provider 自行决定释放是回缓存还是丢弃。
+repair.ts[DR8M]: F:为中断或分叉的开放尾回合合成工具错误结果与 step/turn 收尾 | R:code:packages/core/session/src/fork.ts | A:crash 恢复、SessionStore.fork、session-query 冷读 | S:合成消息 id 前缀按 cause（interrupted 或 forked）区分且时间戳复用最后真实事件，从不发明未来时间；forked 文案提示父会话可能在切点后已完成调用；turn/start、turn/end 与 step/end 清空 pending 表，其它 merge-extensible 事件保留；balance 日志返回空数组。
+surface.ts[DB9L]: F:日志之上的有序表面：surfaceOp 折叠、消息派生与替换判定 | R:code:packages/core/session/src/index.ts | A:Session.deriveMessages、session-query、session-reference | S:浏览器安全子路径——禁止任何 node: 导入否则 vite 打包失败；模型可见表面会遮蔽被替换区间，人类 transcript 必须用 isAppendSurfaceEvent 过滤追加源事件，否则 compaction 替换会把用户已见内容抹掉；空内容 assistant 消息派生为 null 不进历史。
+types.ts[CD9L]: F:会话核心类型：品牌 id、SessionHeader、事件表与回合结束原因 | R:code:packages/core/session/src/index.ts | A:全部会话生态包（persistence、query、subagent） | S:SESSION_FORMAT_VERSION=4，仅结构性变更才 bump——新增事件类型不 bump，由 ignorable 标记兜底；SessionSeq 构造器拒绝 -0 与非安全整数；header.delegationDepth 必须持久化，否则 resume 后子代理深度归零可再委托；session/end-seed 的 append 不拒绝外部写入，插件误写会静默篡改继承边界。
+fork.ts[DR8T]: F:复制精确事件前缀、打继承标记并闭合开放尾回合 | R:code:packages/core/session/src/repair.ts | A:SessionStore.fork | S:boundary 是包含式源 seq，调用方必须先校验其存在且连续；session/end-seed 标记时间取自 boundary 处源事件；inheritedEventCount 只数拷贝的前缀、不含合成 closers。
+request-header.ts[KD7T]: F:request/header 事件折叠、规范化与字段级相等比较 | R:code:packages/core/session/src/index.ts | A:Session.requestHeader 增量折叠、请求装配 | S:规范化把空工具列表折叠为字段缺失（canonical 空省略）；工具 schema 用 JSON.stringify 顺序敏感比较；未变更 header 不记日志的机制依赖这份 equality；
+seq-ranges.ts[KD6T]: F:sourceEventSeqs 无损区间编码与解码（连续三个以上合并为对） | R:code:packages/core/session/src/types.ts | A:compaction 等引用源事件的读写双方 | S:输入非严格递增时 encode 原样返回不合并也不报错；decode 对非数组、负值、start 大于 end、超 maxEntries 抛 TypeError；含区间时要求解码结果严格递增。
+tool-history.ts[DB7T]: F:折叠历史工具声明与 developer 增删生成请求投影 ToolHistory | R:code:packages/core/session/src/index.ts | A:dsh-agent-loop 请求装配 | S:developer/message 引用的 headerSeq 缺定义时直接抛错；旧日志无 tool-update 事件时 snapshot 退化为完整声明加空 updates；
+known-event-types.ts[FD7T]: F:生成式已知事件类型集合与消息投影事件集合（禁手改） | R:code:packages/session/session-persistence/src/storage-contract.ts | A:core/session 表面折叠、persistence 读路径 | S:由 gen-persistence-catalog 脚本生成且 doc-sync 门校验新鲜度；读路径对集合外事件类型 fail-closed 拒读除非带 ignorable:true——静默跳过必需事件会重构出错误会话；
+
+===D:/chengzi-pro/dsh-official/packages/compaction/compaction/src/===
+index.ts[DB8S]: F:压缩服务抽象基类（ctx.compaction）：策略归实现、事务语义固定 | R:code:packages/compaction/compaction-basic/src/index.ts | A:code:packages/compaction/command-compact/src/index.ts | S:compactRegion 的 start/end 是表面位置而非 seq 数值序——替换会让可见 seq 非单调，start 可大于 end，两边缘都必须 tool-pairing 平衡；compaction/start 是压缩锁（log-only）直到 compaction/end 尝试；manual 路径必须先同步启动 idle 任务再做任何异步工作。
+brand.ts[FD4T]: F:CompactionId 品牌类型（无校验直通） | R:code:packages/compaction/compaction/src/types.ts | A:code:packages/compaction/compaction-basic/src/region.ts | S:与 SessionSeq 等校验型 brand 不同，CompactionId() 不做任何验证——身份由实现自铸；
+checkpoint.ts[DD6T]: F:压缩检查点 source 的构造器/谓词（cordis-free 出口） | R:code:packages/compaction/compaction/src/brand.ts | A:人类可读名：压缩后端与持久化消费方 | S:该叶子模块刻意无 cordis 导入、无模块扩充——client/wire 程序可命名检查点而不加载宿主 Context 合并；
+tool-pairing.ts[KR7S]: F:表面切点的 tool-call/result 配对平衡判定（增量缓存） | R:code:packages/compaction/compaction/src/index.ts | A:code:packages/compaction/compaction-basic/src/region.ts | S:平衡按当前表面序从内容推导而非 step 标记（压缩会改变位置）；缓存按 surface.replaceGeneration 键控存 WeakMap；
+types.ts[FD7S]: F:compaction/start|summary|end|prune 事件与 CompactionResult 词表 | R:code:packages/compaction/compaction/src/checkpoint.ts | A:人类可读名：压缩后端与计价消费方 | S:summary 事件 log-only，真正的表面替换由紧随其后的 user/message 完成——该相邻性是契约（影子价协议），消费方可把替换与紧邻其前的计价事件直接配对；
+
+===D:/chengzi-pro/dsh-official/packages/compaction/compaction-basic/src/===
+index.ts[AB8L]: F:基础压缩后端：步间压力与上下文溢出恢复的自动监听注册 | R:code:packages/compaction/compaction/src/index.ts | A:人类可读名：宿主插件加载器 | S:压缩失败但 surface.replaceGeneration 已前进（模型无关 prune 已落地）时仍返回 retry——已落地的持久缩减是充分重试凭据不得丢弃；overflow 重试计数在 agent 转 idle 或收到 assistant/message 时重置（成功响应即重开序列）；TargetPressureConfigError 按 targetKey 每路由只警告一次；
+region.ts[DB8L]: F:保留尾范围选择与共享日志压缩事务（marker 对+替换） | R:code:packages/compaction/compaction/src/tool-pairing.ts | A:code:packages/compaction/compaction-basic/src/index.ts | S:selectCompactableRange 永不把表面 node 0 的 system/message 卷入范围（无 system 头时从 node 0 起选）；token-meter 表面与 session 表面不一致直接抛错——计量失配不可静默；SurfaceChangedError 与摘要/收缩失败刻意区分，人工调用方据此分别报告；
+types.ts[FC5T]: F:compaction-basic 配置与解析后策略的词汇类型 | R:code:packages/compaction/compaction-basic/src/config.ts | A:code:packages/compaction/compaction-basic/src/index.ts | S:ResolvedRetention 是精确一联合（retainRatio xor retainTokens）；ResolvedCompactSpec 的 thresholdTokens/retainTokens 已按 contextWindow 扣除保留输出 token 后换算，不可与原始 ratio 混用；auto 缺省为 true。
+config.ts[FC6M]: F:compaction-basic 配置校验与按路由模型策略合并 | R:code:packages/compaction/compaction-basic/src/types.ts | A:code:packages/compaction/compaction-basic/src/index.ts | S:默认 thresholdRatio=0.8、retainRatio=0.16、headroomTokens=65536、maxTokens 缺省取 headroomTokens；retainTokens 与 retainRatio 互斥为精确一形式；
+summarizer.ts[DA7M]: F:缓存复用的一次性摘要调用与耐久检查点框架 | R:code:packages/compaction/compaction-basic/src/region.ts | A:code:packages/compaction/compaction-basic/src/index.ts | S:摘要指令作为最后一条 user 消息追加而非独立 system prompt——使辅助调用成为上一路由请求的真前缀以复用 KV 缓存；
+
+===D:/chengzi-pro/dsh-official/packages/compaction/compaction-image-offload/src/===
+project-message.ts[KD5T]: F:把选中图像出现标记为 offloaded（不可变消息投影） | R:code:packages/compaction/compaction-image-offload/src/projection.ts | A:code:packages/compaction/compaction-image-offload/src/projection.ts | S:索引不存在或目标已 offloaded 均抛错——幂等性故意不提供，重复决策视为坏历史；返回深冻结新消息且消息身份不变；未命中任何选中项时原 blocks 引用原样返回（不复制）。
+image-offload.ts[DR6T]: F:按请求序挑选最旧保留图像并落 image/offload 决策 | R:code:packages/compaction/compaction-image-offload/src/projection.ts | A:code:packages/compaction/compaction-image-offload/src/index.ts | S:图像索引按每消息内全部出现计数（含已 offloaded 的），实际选中的只是未 offloaded 的；assistant 节点被排除（模型输出不入选）；
+index.ts[ER6T]: F:图像卸载插件：注册投影并挂两条恢复监听 | R:code:packages/compaction/compaction-image-offload/src/image-offload.ts | A:人类可读名：宿主插件加载器 | S:agent/request-error 的重试是持久表面修复而非 provider 重试——不耗重试预算、不记 llm/retry 事件；
+projection.ts[DD6T]: F:image/offload 事件的原子校验与纯重放定义 | R:code:packages/core/session/src/surface.ts | A:code:packages/core/session/src/index.ts | S:该事件类型在 MESSAGE_PROJECTION_EVENT_TYPES 中，未加载本插件时读路径抛 requires-a-message-projection；
+
+===D:/chengzi-pro/dsh-official/packages/context/agent-instructions/src/===
+config.ts[FC6S]: F:指令发现配置规范化与 baseline 身份序列化 | R:code:packages/context/agent-instructions/src/state.ts | A:code:packages/context/agent-instructions/src/index.ts | S:候选文件名含路径分隔符或为 '.', '..' 保留段时被静默过滤而非报错；默认候选 AGENTS.md+CLAUDE.md、本地 overlay .local.md、根标记 .git、maxSourceBytes 1MiB；
+index.ts[AB8M]: F:workspace 指令插件：baseline 注入与文件触碰后的动态投影 | R:code:packages/context/agent-instructions/src/state.ts | A:人类可读名：宿主插件加载器 | S:只认 read/write/edit 三个工具名加 file_path 参数作为触碰信号（硬编码集合，工具改名即失灵）；emit 监听不被等待，投影按 agent 经 projectionTails 链串行化；step 打开时触碰先攒在 stepTouches 待 step/end 再投影，防止与认领批竞争；pre-step 把上下文折入紧随被认领批之后、driver 运行时上下文之前的位置。
+digest.ts[KD5T]: F:指令内容的 SHA-1 身份（精确与裁剪两版） | R:code:packages/context/agent-instructions/src/state.ts | A:code:packages/context/agent-instructions/src/render.ts | S:两个不同身份：精确内容 SHA-1 用于版本状态追踪，trim 后 SHA-1 用于同目录去重——仅首尾空白不同的 symlink 副本折叠为单文件；
+files.ts[IC7L]: F:指令文件发现：user-global 到根→cwd 链的限额可中止读取 | R:code:packages/context/agent-instructions/src/render.ts | A:code:packages/context/agent-instructions/src/index.ts | S:用 stat 而非 lstat——最终组件符号链接跟随（指向普通文件可加载，断链按缺席处理）；
+state.ts[DD7L]: F:会话可见指令状态与动态对账（变更集渲染与缓存更新） | R:code:packages/context/agent-instructions/src/render.ts | A:code:packages/context/agent-instructions/src/index.ts | S:版本缓存只存元数据（path/version/digest/trimmedDigest）刻意不存正文；
+
+===D:/chengzi-pro/dsh-official/packages/context/session-reference/src/===
+index.ts[AB8L]: F:跨会话引用解析：提及转结构化引用、精确读取、预算投影与 durable 上下文 | R:code:packages/context/session-reference/src/projection.ts | A:Host 消息适配器、spill 存储 | S:每消息硬上限 3 个源会话；引用内容按 untrusted 处理——内嵌防指令警告且序列化转义小于号；预算按模型上下文窗口比例估算并有 64KiB 下限；spill 保存失败只报 unavailable，绝不把截断预览冒充完整快照。
+serialization.ts[CS7T]: F:tag-safe JSON 序列化：把所有小于号转义为 unicode 转义 | R:code:packages/context/session-reference/src/projection.ts | A:引用信封渲染 | S:转义不改变 parse 结果但阻断源数据拼出 XML 式开标签，防跨会话提示注入的包裹攻击；非 JSON 可序列化输入抛 TypeError。
+projection.ts[KB8S]: F:当前表面投影为纯文本会话并做字节预算保留 | R:code:packages/context/session-reference/src/index.ts | A:引用准备与全量转储 | S:仅保留 source.kind 为 user 与 compact checkpoint 的用户消息加 assistant 消息——developer、system、tool 与注入上下文一律剔除；按字节截断并记录 omittedBytes，供 spill 侧全量补齐。
+spill.ts[IB7T]: F:预览截断时保存完整投影到 spill 并生成省略通知 | R:code:packages/spill/spill/src/index.ts | A:SessionReferenceResolver | S:仅当预览缺文本才落盘；存储失败降级为 unavailable 加原因，不谎称 saved；转储正文按每行至多 64 码点切 JSON 字符串片段保证行可读，接收方必须解码拼接片段还原精确文本含换行。
+types.ts[CB7T]: F:引用请求、候选与准备结果类型及 MessageSourceMap 合并 | R:code:packages/context/session-reference/src/index.ts | A:Host 适配器与生成的 Remote 客户端 | S:必须走 type-only 子路径导入——生成客户端不得拖入 Host 运行时；capturedFormatVersion 缺省即版本 0；sameWorkspace 让 host 免于比较它从未收到的路径。
+uri.ts[CU7S]: F:dsh-session 冒号规范 URI 编解码与提及文本解析 | R:code:packages/context/session-reference/src/index.ts | A:Host 消息归一化 | S:载荷是 JSON 化 sessionId 的 base64url；decode 要求重编码逐字节等于原文（规范性校验）防别名 id；裸 URI 先按形状预筛再强制规范校验；label 转义反斜杠与右中括号。
+config.ts[CC7T]: F:引用服务配置、魔数常量与稳定错误码族 | R:code:packages/context/session-reference/src/index.ts | A:index.ts 与 host 错误映射 | S:MAX_REFERENCES=3 为每消息硬上限；DEFAULT_MAX_REFERENCE_BYTES=65536 是自动 UTF-8 预算的下限而非总额——实际按模型上下文窗口每 token 四字节估算；
+
+===D:/chengzi-pro/dsh-official/packages/plan/plan-mode/src/===
+index.ts[AB8L]: F:计划模式控制器：投影折叠、/plan 命令与 exit_plan_mode 工具 | R:code:packages/plan/plan-mode/src/types.ts | A:人类可读名：宿主插件加载器与 UI | S:exit_plan_mode 在非激活态仍注册——模式切换只改 prompt 节不改请求工具目录；plan/mode 事件 log-only 非表面、整值替换、最后一条获胜；开 turn 中选择保持 pending 至下一被接受的 in-turn pre-step，append 失败保留 pending 可重试；
+types.ts[FD5T]: F:plan 投影与宿主折叠状态的纯类型（投影键唯一家园） | R:code:packages/plan/plan-mode/src/client.ts | A:code:packages/plan/plan-mode/src/index.ts | S:pending 成立须同时满足：wanted 与 active 不一致、未经配对 command/done 判失败、且无更新 plan/mode 记录该状态；capability 缺失表现为投影键缺席而非特殊值；
+client.ts[FG3T]: F:client 命名空间的 plan 类型出口（纯再导出） | R:code:packages/plan/plan-mode/src/types.ts | A:人类可读名：客户端代码 | S:仓库纪律要求 client 代码只从 ./client 导入类型——与 ./types 同源零复制。
+
+===D:/chengzi-pro/dsh-official/packages/core/agent-tool-presentation/src/===
+index.ts[EE6T]: F:预设级工具呈现模式声明插件（native/ptc/both） | R:code:packages/core/tools/src/index.ts | A:人类可读名：agent 预设组合器 | S:mode 无默认值，省略即该行无意义；ptc/both 经 ctx.inject(['ptcRuntime']) 等待运行时，未合成 runtime 时失败落在 preset 激活审计而非首个 prompt；
+
+===D:/chengzi-pro/dsh-official/packages/compaction/compaction-tool-result-pruner/src/===
+config.ts[FC5T]: F:工具结果修剪预算解析与校验 | R:code:packages/compaction/compaction-tool-result-pruner/src/index.ts | A:code:packages/compaction/compaction-tool-result-pruner/src/index.ts | S:魔法值：threshold 8192 / head 4096 / tail 1024（Unicode 码点）；PRUNE_MARKER 固定文本前后各两换行；
+index.ts[DB7S]: F:模型无关的工具结果头/中/尾确定性修剪服务 | R:code:packages/compaction/compaction/src/types.ts | A:code:packages/compaction/compaction-basic/src/index.ts | S:文本切片按 Unicode 码点而非 UTF-16 码元（代理对不被劈开，字素簇仍可能劈开）；
+types.ts[FD4T]: F:修剪配置与结果记录的词汇类型 | R:code:packages/compaction/compaction-tool-result-pruner/src/config.ts | A:人类可读名：审计与 UI 差额展示 | S:PrunedEntry 同时携带 originalSeq/replacementSeq 与前后码点数——审计
+
+===D:/chengzi-pro/dsh-official/packages/context/file-reference/src/===
+grammar.ts[KU6T]: F:@file 令牌文法：光标处提取与补全插入格式化 | R:code:packages/context/file-reference/src/index.ts | A:人类可读名：终端与 web 客户端编辑器 | S:邮箱中的 @ 不是补全触发（要求行首或空白前缀）；含控制字符或引号的路径返回 undefined（文法无法安全表示）；
+index.ts[DG6T]: F:file-reference 发现接缝：抽象 Service 与模型指引常量 | R:code:packages/context/file-reference-local/src/index.ts | A:code:packages/context/file-reference-local/src/index.ts | S:FILE_REFERENCE_PROMPT 明确告知模型 @token 只是路径引用、内容必须经 read 工具且不得声称已检视；宿主实现决定是否注入该文案（本地实现仅在 read 工具注册时渲染）；
+types.ts[FD4T]: F:补全候选的公共类型（path-only 记录） | R:code:packages/context/file-reference/src/grammar.ts | A:人类可读名：Remote client 与宿主 UI | S:纯类型模块——生成的 Remote client 可无宿主运行时消费；
+
+===D:/chengzi-pro/dsh-official/packages/context/file-reference-local/src/===
+index.ts[IU6S]: F:本地文件系统 @file 发现实现（每 agent 搜索缓存） | R:code:packages/context/file-reference-local/src/search.ts | A:code:packages/context/file-reference/src/index.ts | S:每个 agent 一个 WorkspaceFileSearch，任何 tool/result 事件都使该 agent 索引失效（写后即失效，不辨相关性）；
+search.ts[KP6M]: F:可取消的 workspace 模糊索引与排序候选 | R:code:packages/context/file-reference/src/grammar.ts | A:code:packages/context/file-reference-local/src/index.ts | S:默认排除 .git/node_modules/dist 等 15 个目录名，但 lib 刻意不在列（Ruby gems/npm 源码目录）——排除它会让 @ 静默漏掉这些源，构建产物进
+
+===D:/chengzi-pro/dsh-official/packages/context/time-context/src/===
+index.ts[AO6M]: F:请求时钟上下文：eligible 步注入持久带源时间读数 | R:code:packages/context/time-context/src/request-zone.ts | A:人类可读名：宿主插件加载器 | S:默认 600000ms（10 分钟）刷新下限，0 表示每个 eligible 步都注入；读数是 await next() 之后追加在 decision.messages 尾部的 user 消息；
+request-zone.ts[KL5T]: F:开放 turn 的浏览器时区推导与策略文案 | R:code:packages/context/time-context/src/index.ts | A:code:packages/context/time-context/src/index.ts | S:时区值须为 'UTC' 或 IANA Area/Location 形状，且经 Intl canonical 往返后逐字相等——非规范值抛 TypeError，容错责任在调用方；
+timestamp.ts[KL4T]: F:ISO 形状时间戳格式化（生产与重放验证共用） | R:code:packages/context/time-context/src/index.ts | A:code:packages/context/time-context/src/index.ts | S:固定 en-US + h23 + longOffset 保证重放验证字节稳定，别改 locale；
+
+===D:/chengzi-pro/dsh-official/packages/context/tmux-context/src/===
+index.ts[IO5M]: F:tmux 位置上下文：真 pane 校验与变更驱动再注入 | R:code:packages/core/agent-loop/src/index.ts | A:人类可读名：宿主插件加载器 | S:继承 $TMUX_PANE（VS Code 集成终端）不算在内——须 pane 的 #{pane_tty} 等于本进程 ps -o tty 的控制终端；
+
+===D:/chengzi-pro/dsh-official/apps/desktop/src/client/===
+styles.d.ts[FZ9T]: F:声明 *.css 模块类型 | R:- | A:welcome 渲染端 TS 编译 | S:仅供 standalone Welcome 渲染器 import css 时不报类型错；运行时无实现，css 由 vite 构建进 lib/welcome，别在这里找样式逻辑。
+
+===D:/chengzi-pro/dsh-official/packages/host/open-in-app/src/===
+resolver.ts[IW8L]: F:按平台定位器链解析应用为已验证启动器并执行分离启动 | R:code:packages/host/open-in-app/src/catalog.ts | A:open-in-app 路由层 | S:SSH 启动直接返回空 catalog 不探测；子进程用 scrubbedParentEnv 擦除 *KEY*/*SECRET* 凭证环境；watch 窗口关闭时仍在运行的子进程视为已启动且永不杀死；ENOENT 归类 missing 让调用方单次重解析；Windows 注册表每解析 pass 只读一次（RegistryViewOnce 惰性共享）；resolveExecutable 无宿主默认，缺失即显式抛错而非静默判全部缺失。
+shared.ts[FN7T]: F:open-in-app 路由路径与线格式常量（浏览器安全） | R:code:packages/client/ui-open-in-app | A:host 路由与 client ui 包共用 | S:每条路由同时导出绝对 pathname（Host 注册用）与去首斜杠的 browser 相对形式（浏览器寻址用），必须成对使用；本文件仅常量与类型，经 ./shared 子路径发布给浏览器侧。
+internals.ts[XQ8T]: F:open-in-app 源级测试注入缝 | R:code:packages/host/open-in-app/src/resolver.ts | A:单元测试 | S:生产必须保持 catalog 为空对象默认；resolveInternals 在 resolveExecutable 缺失时显式抛错（由 plugin 注入 subprocess 能力），不会静默把所有 cli 定位器判为不可用。
+index.ts[ES6M]: F:open-in-app 宿主路由：应用列表/图标/启动三端点 | R:code:packages/host/open-in-app/src/resolver.ts | A:client ui-open-in-app 浏览器端 | S:每条路由先过 connection.requestRejection（Host/Origin 防 DNS 重绑定+登录 cookie 鉴权）再处理；
+catalog.ts[FB6M]: F:可启动应用编译期目录：各平台定位器链数据表 | R:code:packages/host/open-in-app/src/resolver.ts | A:open-in-app 路由与解析器 | S:PATH_TOKEN 即 {path} 替换进 argv，无 token 时目录追加到 argv 末尾；shell-open 走 OS shell open verb 而非直接 spawn explorer（后者不能可靠前置窗口）；
+icons.ts[IG6S]: F:按平台提取应用图标为 PNG/SVG 字节 | R:code:packages/host/open-in-app/src/resolver.ts | A:open-in-app icon 路由 | S:任何失败一律 resolve null 让路由回 404、浏览器渲染通用图标；Windows 经生成的 PS1 脚本 ExtractAssociatedIcon 最多只得 32px（无原生 addon 上限）；
+
+===D:/chengzi-pro/dsh-official/packages/host/open-in-app/===
+tsdown.config.ts[OV7T]: F:open-in-app 打包配置 | R:- | A:构建流水 | S:入口是 tsc 产物 lib/types/index.js 而非 src；./shared 子路径不经打包直接解析该产物树，因此 bundle 只能保持单一入口。
+
+===D:/chengzi-pro/dsh-official/packages/host/webserver/src/===
+index.ts[RN9M]: F:node:http 路由注册服务：exact/prefix 路由+升级+fallback 席位 | R:code:packages/host/frontend-static/src/index.ts | A:host 组合层各路由插件 | S:重复(kind,path)路由、重复升级路径、第二个 fallback 注册均抛错（组合级契约）；单请求 handler 异常只记 warn 并回 400 或 destroy，绝不因坏请求退出进程；gzip 过滤跳过 content-range 与 SSE，res.socket 为空的 Worker 隧道直通；升级 socket 不在 closeAllConnections 覆盖内，服务自行跟踪销毁；port=0 时实际端口以 this.port 为准。
+injections.ts[FS8S]: F:结构化 index 注入行渲染（head/body 两区） | R:code:packages/host/webserver/src/index.ts | A:webserver renderIndex 与 worker boot 载荷 | S:script/style 行 text 不得含 </script、</style（会提前闭合标签）；global 行 JSON 序列化后把 < 替换为 \u003c 防逃逸；尾部 READY_MARKUP 结算 __DSH_BOOT_READY__ deferred，客户端入口必须 await 其 promise 后才能读注入状态；页面缺 head/body 标签时分别前插/后插兜底。
+
+===D:/chengzi-pro/dsh-official/packages/host/product-telemetry-otel/src/===
+index.ts[IO6S]: F:产品遥测 OTel 适配：事件入队与批量导出 | R:code:packages/host/product-telemetry-otel/src/index.ts | A:宿主组合挂载方 | S:挂载即建 reporter 但不主动发送，owner fiber 卸载时才 drain；emit 入队成功不代表 collector 已收到；maxExportBatchSize 不得超过 maxQueueSize（构造即抛）；
+
+===D:/chengzi-pro/dsh-official/packages/host/plugin-inventory/src/===
+index.ts[IG6S]: F:Loader 插件条目只读投影（Typert Remote） | R:code:packages/host/plugin-inventory/src/types.ts | A:client ui-plugin-inventory | S:每次调用直读 Loader 不建缓存（避免第二生命周期真相源）；group 条目被排除；FiberState 为跨包 const enum，此处手工镜像数字 0-5，DISPOSED 映射 null；
+types.ts[FD7T]: F:插件清单快照类型面 | R:code:packages/host/plugin-inventory/src/index.ts | A:client 侧清单 UI | S:preset 行 enabled 可为 conditional——表示存在 !!js disabled 表达式且无 session 挂载，只有 Loader 上下文能判定真假；broken 非空时 rows 必为空数组；
+
+===D:/chengzi-pro/dsh-official/packages/host/directory-picker/src/===
+types.ts[FG8T]: F:目录浏览行/层级类型（client 安全） | R:code:packages/host/directory-picker/src/index.ts | A:client ui-directory-picker-browse | S:crumbs 每项都是可跳转目标且 hidden 恒 false；根 crumb 的 name 是完整路径（如 / 或 C:\）；truncated=true 时缺失行是 name 排序尾部，hidden 行也计入上限；hidden 仅按 POSIX 点前缀约定，Windows hidden 属性不暴露。
+index.ts[CG9S]: F:ctx.directoryPicker 能力缝服务定义（native/browse 判别联合） | R:code:packages/host/directory-picker-browse/src/index.ts | A:browse/native 后端与 client ui-workspace | S:每 context 仅允许一个实现（第二个抛 cordis 重复服务错）；capability 对象须服务期稳定，消费者可跨调用捕获；未知 capability kind 的约定是隐藏入口而非报错；browse 的 list/createDirectory 要求 fully qualified 路径，相对值按错误拒绝，绝不 resolve 到 host cwd。
+
+===D:/chengzi-pro/dsh-official/packages/host/directory-picker-browse/===
+tsdown.config.ts[OV7T]: F:browse 后端打包配置 | R:- | A:构建流水 | S:入口是 tsc 产物 lib/types/index.js；clean:false 以免清掉 tsc 输出。
+
+===D:/chengzi-pro/dsh-official/packages/host/directory-picker-native/src/===
+index.ts[DU7T]: F:native 后端：注册 ctx.directoryPicker 的 native 能力 | R:code:packages/host/directory-picker-native/src/native-picker.ts | A:directory-picker-auto 装配 | S:Windows 走 koffi IFileOpenDialog 子进程，无 PowerShell 回退层（已归档的简化决策），失败原样抛出；仅当操作员在主机屏幕前可用，远程部署必须组合 browse 后端。
+native-picker.ts[IU6S]: F:跨平台原生目录选择器分发 | R:code:packages/host/directory-picker-native/src/win32-dialog.ts | A:NativeDirectoryPicker | S:macOS osascript exit 1 且 stderr 匹配 User canceled/-128 且未 abort 才算取消；
+win32-dialog.ts[DR6S]: F:Win32 文件夹对话框子进程驱动与中止服务 | R:code:packages/host/directory-picker-native/src/win32-dialog-worker.ts | A:native-picker | S:abort 服务无条件启动预算（即使尚未收到 showing）：每 150ms 重发 WM_CLOSE，20 次后 kill worker 并报 dialog unresponsive；
+win32-dialog-worker.ts[RR6T]: F:对话框子进程入口：阻塞 Show 并回报 IPC 消息 | R:code:packages/host/directory-picker-native/src/win32-dialog.ts | A:win32-dialog-host spawn | S:必须以 IPC 子进程运行，缺 DSH_DIALOG_TITLE 或 process.send 即抛；父端 disconnect 即 exit(0) 防孤儿对话框留在屏幕；
+win32-dialog-host.ts[IR7T]: F:对话框子进程真实 spawn 与关窗再导出 | R:code:packages/host/directory-picker-native/src/win32-dialog-bindings.ts | A:win32-dialog 驱动 | S:以 import.meta.url 是否 .ts 区分：源态经 tsx 引导子进程，构建态加载同目录 worker.cjs；stdio 为 ignore/inherit/inherit/ipc 且 windowsHide=true；标题经环境变量 DSH_DIALOG_TITLE 传递而非 argv。
+win32-dialog-bindings.ts[IG6M]: F:koffi 绑定：COM vtable 槽调用与跨线程关窗 | R:code:packages/host/directory-picker-native/src/win32-dialog-logic.ts | A:win32-dialog-worker/host | S:koffi 在函数内动态 import，非 Windows 进程永不加载；vtable 槽位固定（release2/show3/setOptions9/setTitle17/getResult20，IShellItem GetDisplayName=5），指针宽度取 koffi.sizeof（x64=8）。
+
+===D:/chengzi-pro/dsh-official/packages/host/directory-picker-native/===
+tsdown.config.ts[OV7T]: F:native 后端双产物打包配置 | R:- | A:构建流水 | S:双入口——lib/types/index.js 出 ESM，win32-dialog-worker 另出 CJS 产物 lib/worker.cjs（工作区约束以 ./worker 导出为键）；clean:false。
+
+===D:/chengzi-pro/dsh-official/packages/host/directory-picker-auto/src/===
+resolve.ts[DC7T]: F:boot 期后端选型纯函数 | R:code:packages/host/directory-picker-auto/src/probe.ts | A:directory-picker-auto apply | S:任何含糊情形一律落 browse；native 需同时满足 loopback 绑定、非 SSH、平台有可用显示（linux 还需 DISPLAY/WAYLAND_DISPLAY 非空且 zenity/kdialog 在 PATH）；环境变量空字符串按未设置处理。
+probe.ts[DG7T]: F:Linux 选择器二进制 PATH 探测 | R:code:packages/host/directory-picker-auto/src/resolve.ts | A:directory-picker-auto apply | S:仅探测 zenity 与 kdialog 两个二进制；accessSync X_OK 失败唯一含义是不可执行；PATH 缺失或空时扫描零目录返回 false。
+index.ts[AC6S]: F:boot 期自适应装配 native/browse 后端与 client 界面成对 Loader 条目 | R:code:packages/host/directory-picker-auto/src/resolve.ts | A:宿主组合 | S:仅 boot 采样一次并把 backend+surface 两个 Loader entry 挂进内存根树（write 是 no-op，绝不持久化回配置文件）；
+
+===D:/chengzi-pro/dsh-official/packages/web/web/src/===
+index.ts[CN9S]: F:ctx.web 能力缝：搜索/抓取 provider 注册与执行期选择 | R:code:packages/web/web/src/types.ts | A:tool-web 与各 provider 插件 | S:provider 在执行期解析、与注册顺序无关；配置 id 未注册=CONFIGURED_MISSING，注册但不可用=UNAVAILABLE，无配置且多可用=AMBIGUOUS；env DSH_WEB_SEARCH_PROVIDER/DSH_WEB_FETCH_PROVIDER 等价于配置字段而非隐藏优先级链；search 结果超 maxResults 由缝截断并置 truncated；重复 id 注册抛 WEB_DUPLICATE_PROVIDER；fetch 非 2xx 是结果不是异常。
+types.ts[FN9S]: F:web 缝类型词表与 WebError | R:code:packages/web/web/src/index.ts | A:全部 web provider 与 tool-web | S:WebFetchBody 是封闭联合（html/text），新增 kind 属跨包协调变更，会使所有 default:assertNever 消费者编译失败；source 的 title/snippet/publishedAt 故意可缺——Perplexity 引用可能只有 URL，强造字段即撒谎；非 2xx 属 WebFetchResult 状态而非错误；WebError 继承 HarnessError，code 为开放字符串机器可路由。
+
+===D:/chengzi-pro/dsh-official/packages/web/tool-web/src/===
+trust.ts[FS7T]: F:外部网页内容不可信声明常量 | R:code:packages/web/tool-web/src/search.ts | A:web_search/web_fetch 输出格式化 | S:该前缀必须保持在 provider 控制文本之前，把外部内容标为数据而非指令——这是防提示注入的标记机制，删除即引入注入面。
+index.ts[EB6S]: F:注册 web_search/web_fetch 模型工具及默认上限 | R:code:packages/web/tool-web/src/search.ts | A:宿主插件装载 | S:启用开关只控制注册，工具在 provider 不可用时仍可见、执行时才报结构化错误；fetchMaxOutputChars 默认 200k 高于本地 provider 100k body cap；
+search.ts[EB6L]: F:web_search 工具：多 query 并发合并与来源呈现 | R:code:packages/web/web/src/index.ts | A:模型 tool 调用 | S:多 query 并发执行，任一失败 abort 兄弟并等 allSettled 后重抛首个错误；合并按 URL 去重且 round-robin 轮转排序；
+fetch.ts[EB6L]: F:web_fetch 工具：HTML 转 markdown 与输出封顶 | R:code:packages/web/web-fetch-http/src/provider.ts | A:模型 tool 调用 | S:MAX_CONVERSION_DEPTH=512：超深嵌套 HTML 整体省略不转换（domino 树超线性、同步转换会饿死 cooperative timer，实测 2000 层约 2s）；
+
+===D:/chengzi-pro/dsh-official/packages/web/web-fetch-http/src/===
+index.ts[EN6S]: F:本地 HTTP(S) fetch provider 注册与限额校验 | R:code:packages/web/web-fetch-http/src/provider.ts | A:ctx.web 注册表 | S:timeoutMs 上限 2147483647——Node 会把更大 timer 强制为 1ms，故在配置期直接拒绝；maxRedirects=0 表示不跟随；
+policy.ts[DS7S]: F:URL 校验与 Content-Type 分类（纯函数半区） | R:code:packages/web/web-fetch-http/src/network.ts | A:HttpFetchProvider | S:仅允许 http/https；URL 内嵌凭据即拒绝（WEB_BLOCKED_URL）；URL 长度上限 2048；跨源重定向被拒以强制新 origin 走完整公网校验；
+network.ts[IS7S]: F:DNS 一次性公网校验与地址钉扎传输（SSRF 防线） | R:code:packages/web/web-fetch-http/src/policy.ts | A:HttpFetchProvider | S:校验过的地址集经自定义 lookup 钉给本次连接，undici 不会二次解析，防验证与连接之间 DNS 漂移；
+provider.ts[IS7M]: F:安全 HTTP 抓取：同源重定向+字节/字符封顶+解码 | R:code:packages/web/web-fetch-http/src/network.ts | A:ctx.web fetch 能力 | S:重定向目标重过 validateFetchUrl 且必须同源；Content-Length 超限立即拒，流式超限截断置 truncated（恰好填满容量不算截断，须读到 EOF）；
+
+===D:/chengzi-pro/dsh-official/packages/web/web-search-exa/src/===
+provider.ts[IN6S]: F:Exa /search 高亮摘要搜索 provider | R:code:packages/web/web-search-exa/src/index.ts | A:ctx.web search 注册表 | S:无任何非空 highlight 的结果条目被整体丢弃（seam 无处可造 snippet，造即撒谎）；content 恒缺（Exa 无生成答案）；truncated 恒 false（最终截断归缝管）；
+index.ts[EN6T]: F:注册 Exa 搜索 provider | R:code:packages/web/web-search-exa/src/provider.ts | A:宿主插件装载 | S:apiKey 缺省回落环境 EXA_API_KEY（信任启动环境各层），为空即 provider 不可用；numResults 未配置时整个字段不发送而非发默认值。
+types.ts[FN7T]: F:Exa 搜索 API 线类型 | R:code:packages/web/web-search-exa/src/provider.ts | A:provider 映射层 | S:highlights 须经 contents.highlights.highlightsPerUrl 显式请求，未请求则响应无 snippet 可映射；publishedDate 映射为 publishedAt。
+
+===D:/chengzi-pro/dsh-official/packages/web/web-search-perplexity/src/===
+provider.ts[IN6S]: F:Perplexity chat-completions 搜索 provider | R:code:packages/web/web-search-perplexity/src/index.ts | A:ctx.web search 注册表 | S:优先结构化 search_results[]，仅在缺席时回落 URL-only citations[]（此时 source 仅含 url）；生成答案进 content（是三个 provider 中唯一默认带答案的）；
+index.ts[EN6T]: F:注册 Perplexity 搜索 provider | R:code:packages/web/web-search-perplexity/src/provider.ts | A:宿主插件装载 | S:apiKey 缺省回落环境 PERPLEXITY_API_KEY；searchRecency 映射为请求字段 search_recency_filter，未配置时整个字段不发送。
+types.ts[FN7T]: F:Perplexity 线类型（OpenAI 兼容形） | R:code:packages/web/web-search-perplexity/src/provider.ts | A:provider 映射层 | S:search_results 与 citations 的优先级由 provider 决定而非 API 保证；各可选字段可能为 null，映射时空值省略而非置空串。
+
+===D:/chengzi-pro/dsh-official/packages/shell/shell/src/===
+index.ts[CG9S]: F:ctx.shell 执行缝抽象服务：请求解析+进程句柄契约 | R:code:packages/shell/shell/src/types.ts | A:bash-local/pwsh-local 及 sandbox 变体 | S:前台是调用方等待方式的属性而非 spawn 属性——保留句柄即后台；result() 仅基础设施失败才 reject，非零退出/超时杀/中止杀都是描述性 resolve；timedOut 与 aborted 互斥（单一融合 deadline 取首因）；onExpiry=none 不装定时器；准备期超时返回已结算空句柄；组合拆卸经 subprocess 缝杀进程，executor 单独 reload 不影响存活进程。
+types.ts[FD8S]: F:shell 缝类型词表：请求/spec/结果/后台句柄 | R:code:packages/shell/shell/src/index.ts | A:全部 shell executor 与工具 | S:dshEnv 托管 DSH_* 快照在 env 之后合并且 executor 先丢弃环境中的 DSH_*，防陈旧值继承与调用方覆盖；stdin/env/dshEnv 不暴露给模型面工具（模型用 heredoc/管道）；observed 流是非消费型偏移读取器，被拒 spawn 的 stderr 即 spawn failed 说明全文；readOutput 是消费型游标，连续读取不重复；lossy 时给出 spill 全文文件路径。
+render.ts[FG8T]: F:shell 工具退出状态标记契约解析 | R:code:packages/shell/tool-bash/src/render.ts | A:bash/pwsh 工具与 Web 终端卡 | S:parseExitStatus 只认结尾的 [exit code: N] 或 [killed by signal: X]（要求前导换行+串尾锚定），标记从 body 移除以免终端卡重复渲染退出；timeout/sandbox 等其他标记留在 body；回放只存渲染文本，必须靠此解析恢复退出状态 pill。
+
+===D:/chengzi-pro/dsh-official/packages/shell/bash-sandbox/src/===
+helpers.ts[DQ8T]: F:沙箱结果判别共享助手（再导出） | R:code:packages/shell/pwsh-sandbox/src/helpers.ts | A:SandboxBashExecutor | S:分类签名区分大小写不敏感子串匹配；pwsh 侧同名文件是刻意逐调用镜像（jscpd 标注），修改判别逻辑时两份必须同步。
+index.ts[DS6M]: F:沙箱消费型 bash 执行器：经 ctx.sandbox 包裹 argv | R:code:packages/shell/bash-local/src/index.ts | A:tool-bash | S:沙箱策略不在本插件配置而在 ctx.sandboxPolicy（每会话每调用解析）；
+
+===D:/chengzi-pro/dsh-official/packages/shell/pwsh-sandbox/src/===
+index.ts[DS6M]: F:沙箱消费型 PowerShell 执行器（bash-sandbox 逐行镜像） | R:code:packages/shell/pwsh-local/src/index.ts | A:tool-pwsh | S:Windows 上经 ctx.sandbox 解析为 ACL 受限 token runner 链；
+helpers.ts[DR6S]: F:沙箱 runner 失败与 denial 判别（pwsh 镜像全量实现） | R:code:packages/shell/bash-sandbox/src/helpers.ts | A:SandboxPwshExecutor | S:isRunnerSpawnFailure 只在 Node ENOENT/EACCES 且 syscall 为 spawn <runnerProgram> 或 error.
+
+===D:/chengzi-pro/dsh-official/packages/shell/tool-bash/src/===
+render.ts[DG6S]: F:bash 结果模型面渲染：标记序列与截断提示 | R:code:packages/shell/shell/src/render.ts | A:presentResult/render 输出 | S:退出标记必须最后（parseExitStatus 尾部锚定）；非零退出是报告不是 error，仅 spawn/中止等基础设施失败走 isError；
+index.ts[EB6L]: F:bash 模型工具：前台/后台/超时转后台/沙箱升级 | R:code:packages/shell/shell/src/index.ts | A:模型 tool 调用 | S:有 jobs 注册表时前台命令也注册为 job（可见可杀），等待超时则转后台并附一次消费读使 job_output 无缝续接；无注册表时仅前台由 deadline 杀；
+background.ts[DM7S]: F:bash 句柄到通用 job 词汇适配 | R:code:packages/shell/tool-bash/src/index.ts | A:JobRegistry | S:非零命令退出归 completed 而非 failed（与前台渲染一致），仅基础设施失败才 failed；spawn 前的读返回空但保偏移；sandbox.runnerFailed 附注明示是沙箱问题而非命令失败；
+
+===D:/chengzi-pro/dsh-official/packages/shell/tool-pwsh/src/===
+background.ts[DM7S]: F:pwsh 句柄到 job 词汇适配（bash 镜像） | R:code:packages/shell/tool-bash/src/background.ts | A:JobRegistry | S:与 bash 版逐行镜像（jscpd 标注）；outcome 的 killed detail 仅在信号已知时带信号名，否则写 killed before exit。
+render.ts[DG6S]: F:pwsh 结果渲染（bash render 镜像） | R:code:packages/shell/tool-bash/src/render.ts | A:presentResult/render 输出 | S:与 bash 版共用 shell/render 的退出标记契约；RenderablePwshResult 无 kind 字段（schema 派生值形）；其余标记顺序/语义与 bash 相同，修改时两份同步。
+index.ts[EB6L]: F:pwsh 模型工具（tool-bash 逐调用镜像） | R:code:packages/shell/tool-bash/src/index.ts | A:模型 tool 调用 | S:工具描述随沙箱装配动态追加 Windows 受限 token 契约：read-only 下 ConstrainedLanguage（.
+
+===D:/chengzi-pro/dsh-official/packages/deliverables/tool-present/src/===
+types.ts[FD8T]: F:PresentedFile 类型与 Session 事件声明 | R:code:packages/deliverables/tool-present/src/index.ts | A:session 投影消费方 | S:deliverables/presented 事件含嵌套调用的成功最终结果；文件内容留在源路径不迁移，消费方按路径实时打开。
+index.ts[EB6S]: F:present 工具：声明既有文件为交付物并入 Session 事件 | R:code:packages/deliverables/tool-present/src/types.ts | A:client ui-deliverables | S:仅在开放 turn 内可用（无 turnBoundary 即抛错）；交付在 tools/result 且结果非 error 时才落 deliverables/presented 事件（WeakMap 关联 exec）；
+
+===D:/chengzi-pro/dsh-official/packages/deliverables/workspace-changes/src/===
+recorder.ts[DD7L]: F:每 Session turn 记录器：快照/捕获/对比服务 | R:code:packages/deliverables/workspace-changes/src/git.ts | A:workspace-changes apply | S:所有比较用 symlink 解析后的规范路径（git 报告解析路径）；turn 失败不记录、下一 turn 重试；捕获副本按内容 SHA-1 存 Session 专属临时目录，后续编辑不影响两侧；
+git.ts[IP7S]: F:git 工作树快照/树差异/忽略检查执行器 | R:code:packages/deliverables/workspace-changes/src/numstat.ts | A:TurnRecorder | S:git 参数永不经 shell；每命令超时+输出上限，stdout 超帽丢头部标 truncated；非零退出是结果不是异常，超时/中止/spawn 失败才抛；环境经凭证擦除；终止宽限固定 2s、保留 16KB stderr 尾。
+paths.ts[DG7S]: F:路径分类与展示形式（~/缩写、posix 化） | R:code:packages/deliverables/workspace-changes/src/recorder.ts | A:recorder/git 共用 | S:canonicalPath 对不存在路径经最近存在祖先解析，使经目录 symlink 创建的文件前后规范拼写一致；
+compare.ts[DG7S]: F:两文本行级对比（超时降级整文件替换） | R:code:packages/deliverables/workspace-changes/src/types.ts | A:TurnRecorder diff 服务 | S:diff 库 structuredPatch 超时返回 undefined 时降级为删除全部旧行+新增全部新行的单 hunk 并标 coarse；空文本视为零行而非一行空行；末行无换行时补终止符使按内容比较；上下文固定 3 行。
+numstat.ts[DG8T]: F:git diff-tree --numstat -z 输出解析 | R:code:packages/deliverables/workspace-changes/src/git.ts | A:GitRunner 消费方 | S:仅前两个制表符分隔字段，文件名可含制表符；rename 记录路径字段为空后随旧/新两个路径；尾部必须 NUL 终止否则视为截断抛错；二进制行 added 为 - 记 0 计数并标 binary。
+types.ts[FD7T]: F:变更摘要/diff hunk/服务类型面 | R:code:packages/deliverables/workspace-changes/src/index.ts | A:client 消费方 | S:WorkspaceChangedFile 的 added/deleted 对二进制与 oversized 恒为 0；summary.snapshot 仅在实际拍过快照时出现；diff 惰性计算——摘要只列文件，比较在请求时才读两侧内容。
+capture.ts[DD7S]: F:文件工具编辑前后整文件内容寻址捕获 | R:code:packages/deliverables/workspace-changes/src/recorder.ts | A:TurnRecorder | S:最多读 maxBytes+1 字节，文件在读取中增长也不会超内存；超帽记 oversized 不存内容；二进制探测仅查前 8000 字节的 NUL；打开失败仅 ENOENT 记 absent，其他 fs 错误上抛。
+index.ts[AB6M]: F:每 turn 工作区变更汇总服务与 Session 事件 | R:code:packages/deliverables/workspace-changes/src/recorder.ts | A:client ui-workspace 变更面板 | S:git 可执行解析一次缓存；macOS 上 /usr/bin/git 是 Xcode 存根会弹安装对话框，须先探测 xcode-select -p 否则视为无 git；
+
+===D:/chengzi-pro/dsh-official/packages/document/office-to-pdf/src/===
+output.ts[DS7S]: F:有界完整 PDF 输出读取校验 | R:code:packages/document/office-to-pdf/src/index.ts | A:convertBytes | S:用 O_NOFOLLOW 打开且 lstat 先行，拒绝链接形输出；分配 size+1 读满检测转换后增长；完整性校验要求头 %PDF-x.x 且末 1KB 含 %%EOF，缺一即 invalid-output；所有读之间插 throwIfAborted。
+identity.ts[FD8T]: F:branded 身份类型与构造器 | R:code:packages/document/office-to-pdf/src/queue.ts | A:provider/queue/cache | S:OfficeToPdfKey 含 generation 前缀，消费方不得解析其内部结构；generation 变更即令全部缓存键失效。
+types.ts[FN7S]: F:Office 转 PDF 请求/结果/错误码类型 | R:code:packages/document/office-to-pdf/src/index.ts | A:Remote 调用方 | S:source.read 是延迟读取——排队中的生产请求不得捕获已缓冲输入；read 返回 version 与授权时不一致即拒；source.bytes 缺省时预留整个输入上限；
+errors.ts[FQ9T]: F:OfficeToPdfError 分类错误类 | R:code:packages/document/office-to-pdf/src/types.ts | A:provider 与消费方 | S:code 是封闭枚举（含 busy/source-changed 等面向消费者的类别）；引擎细节只留在 cause，不进 message。
+queue.ts[DP7L]: F:有界源准入+内容寻址共享转换队列 | R:code:packages/document/office-to-pdf/src/index.ts | A:OfficeToPdf | S:后台 reader 上限是 maxReaders-1（为前台留位）；队列满时可逐出队首 background 任务让位前台；
+
+===D:/chengzi-pro/dsh-official/packages/client/connection/src/===
+loopback-hostname.ts[IG8T]: F:零依赖环回主机名判定 | R:code:packages/client/connection/src/api-request-trust.ts | A:Host 围栏与 ctx.connection 状态 | S:仅认 localhost、[::1] 与 127/8 的四段 IPv4；IPv6 字面量保留方括号形态传入；谓词刻意保持包内私有，client 插件经 Cordis 派生态消费。
+rpc-host.ts[EN7M]: F:宿主 RPC/Fetch 通道注册表与 HTTP 适配 | R:code:packages/client/connection/src/rpc.ts | A:各 Typert Remote 服务 | S:channel 匹配 ^/[A-Za-z0-9._~-]+$、endpoint 段 [A-Za-z0-9_$.-]，注册前即断言；所有准入请求以单一 OperatorPeer 身份发言并作 invocation.peer 传入；通道注册归属调用方 fiber 作用域。
+rpc.ts[FN7S]: F:连接 RPC 通用契约：信封/附件/失败码 | R:code:packages/client/connection/src/rpc-schema.ts | A:宿主与客户端两半 | S:二进制附件在传输分帧前按结果相对路径以 null 占位分离，字节走 JSON 元数据之外的通道；transportError 把传输拒绝归一为 gateway/internal 失败；
+rpc-schema.ts[FN8T]: F:RPC 信封运行时 zod 校验 | R:code:packages/client/connection/src/rpc.ts | A:http-bridge 载入点 | S:envelope 只校验外壳（type/rpcId/method），endpoint 载荷校验归其所有者；result 是 ok/value 与 ok/error 的判别联合，值解析器按 endpoint 注入。
+index.ts[EN7S]: F:client-connection 宿主插件：/api 桥接+浏览器鉴权+信任围栏 | R:code:packages/client/connection/src/api-request-trust.ts | A:全部宿主 Remote 服务与浏览器端 | S:maxRequestBodyBytes 默认 300MiB——按 200MiB 聚合图片 base64 膨胀 4/3 加 1MiB 信封余量推得，配置小于所需值即加载失败；
+http-bridge.ts[IN7S]: F:node:http 与 fetch 形 handler 的双向桥 | R:code:packages/client/connection/src/index.ts | A:/api 传输 | S:客户端断连检测必须挂 response 的 close 而非 request——Node 16 起 IncomingMessage 的 close 在请求体读完即触发（bodyless GET 立即触发），挂错会刚开局就中止流式
+
+===D:/chengzi-pro/dsh-official/packages/client/connection/src/client/===
+index.ts[EN6S]: F:浏览器连接根：Remote 传输与连接代际恢复 | R:code:packages/client/connection/src/client/connection.ts | A:全部浏览器 API 客户端 | S:connection/reset 事件在每代建立时发出——wire 派生缓存必须整体重拉，长连接流自管恢复与基线；
+rpc.ts[EN6S]: F:浏览器通用 unary RPC caller | R:code:packages/client/connection/src/rpc-schema.ts | A:Gateway API 客户端 | S:rpcId 以 randomUuid 铸造并要求响应回显关联；发送前用与宿主相同的 channel/endpoint 模式断言目标；
+connection.ts[ER6M]: F:连接代际就绪/取消/持续恢复循环 | R:code:packages/client/connection/src/recovery-config.ts | A:client/index 装配 | S:MANUAL_RECONNECT 与 NETWORK_STATE_CHANGED 是内部哨兵错误驱动重连而非故障；状态 connected/disconnected/connecting 等价态去重后才通知；
+
+===D:/chengzi-pro/dsh-official/packages/client/hmr/src/===
+index.ts[EN6S]: F:客户端图变更 SSE 传输（/plugins/events） | R:code:packages/client/hmr/src/events.ts | A:浏览器模块控制器 | S:刻意 stat 轮询（网络挂载收不到 inotify），默认 500ms 与构建侧 watcher 一致；对每个图行 bundle 记录 mtime/ctime/size 三元组判定变化；SSE 连接建立即发全量 graph 帧；
+events.ts[FN7T]: F:/plugins/events SSE 线协议单源 | R:code:packages/client/hmr/src/index.ts | A:两端共用 | S:共享类型只防两端漂移不防解析——浏览器半在 JSON parse 点自校验；未知 type 前向兼容返回 unknown，畸形返回 invalid；
+
+===D:/chengzi-pro/dsh-official/packages/client/modules/src/===
+index.ts[EN6S]: F:客户端模块系统 node 半：dsh.client 扫描与 combo 服务 | R:code:packages/client/hmr/src/index.ts | A:web 启动与 HMR | S:扫描只有增量路径——每个 internal/plugin 发射标脏入口名、微任务对账，首扫与稳态共用一套实现；
+
+===D:/chengzi-pro/dsh-official/packages/client/web/src/===
+index.ts[ER7T]: F:Web 壳库入口 | R:code:packages/client/web/src/boot.ts | A:apps/web Vite 入口 | S:产品是 AppWebEntry——由 apps/web 对 #root 运行；静态模块表与平台词表构成本包构建期契约，boot 页与 fiber 状态投影保持内部。
+boot.ts[ER6M]: F:Web 启动内核：模块系统+Loader+无框架 boot 页 | R:code:packages/client/web/src/boot-client.ts | A:AppWebEntry 与测试载体 | S:内核只拥有模块系统、Cordis loader 与 boot 页；插件组合与渲染器交接分属 bootClient/mountClient；
+seed.ts[EV6S]: F:平台单例模块表种子 | R:code:packages/client/web/src/platform.ts | A:模块 loader 的 require 外部解析 | S:satisfies Record<PlatformModule, unknown> 钉住投影契约——词表加词而此处缺静态导入（或反之）会编译失败而非运行时 require miss；值是壳层静态 import，保证所有 bundle 看到同一实例。
+platform.ts[FV6T]: F:共享浏览器平台模块词表 | R:code:packages/client/web/src/seed.ts | A:seeding/bundling/Vite alias 三方 | S:PLATFORM_MODULES 是唯一事实源，三方共同消费防模块身份漂移；PRELOADED_CLIENT_EXTERNALS 当前为空数组。
+boot-client.ts[ER6S]: F:生产客户端组合：装载 Loader 并审计激活 | R:code:packages/client/web/src/loader-status.ts | A:AppWebEntry 与整客户端测试载体 | S:loader.internal 赋模块系统；每 manifest 行建一个 Loader entry（entry 名=行 id）；经 internal/status 投影每行状态给 boot 页；
+loader-status.ts[FV7T]: F:FiberState 运行时镜像与 boot 页标签 | R:code:packages/client/web/src/boot-client.ts | A:boot 链 | S:const enum 无运行时对象且 esbuild 管线不能跨模块内联，故手工镜像 PENDING0..UNLOADING5 数值并保留类型——更新 cordis pin 时必须核对此表与 vendored 定义一致。
+mount.ts[ER7T]: F:经依赖 fiber 挂载 UI 渲染器 | R:code:packages/client/web/src/boot-client.ts | A:AppWebEntry 与测试载体 | S:挂载 effect 装在 uiRenderer 服务的依赖 fiber 上——替换 uiRenderer 服务即自动卸载重挂应用；uiRenderer 未就绪时 effect 在服务到达时才安装。
+apply-injections.ts[EG6S]: F:页面侧结构化注入表解释器（worker 部署） | R:code:packages/host/webserver/src/injections.ts | A:静态 worker 页面 | S:行严格按表序执行，global 行先于读取它的脚本落 globalThis；script-preload 行可能被跳过——某些传输无法只预载不执行，真正请求归 loadScript；
+
+===D:/chengzi-pro/dsh-official/packages/client/store/src/===
+index.ts[CD9S]: F:React-free 快照存储引擎与 defineStore 声明壳 | R:code:packages/client/store/src/contract.ts | A:ui-slots/ui-renderer 及全部控制器 | S:引擎产物是裸 observable（subscribe/getSnapshot/update/set），刻意无 selector hook；hook 合成权独占在 ui-renderer（唯一 uSES 桥、按源缓存在绑定点）；notifySubscribers 先复制监听集合再派发防回调中途增删饿死，单回调异常只 console.error 不中断其余。
+contract.ts[FD8S]: F:框架无关快照与 store 契约 | R:code:packages/client/store/src/index.ts | A:整个槽系统 | S:ActionsDecl 是 store 的完整写集（审计面）——组件只能经 actions 写状态；BakedActions 把 draft 参数剥掉绑定到实例后交给组件；MaybeSnapshotSelectorHook 的 hook 恒存在、选中值可缺，保证 no-session/session 切换时 hook 调用点稳定。
+
+===D:/chengzi-pro/dsh-official/packages/client/locale/src/===
+index.ts[EC6T]: F:宿主注册浏览器 locale 偏好 | R:code:packages/client/locale/src/locale-settings.ts | A:浏览器 locale scope | S:preference 缺省即跟随浏览器；组合 settings 时以 auto:false 配置命名空间（经配置表单投影消费）；内置 locale 仅 zh/en，语言包插件可提供任意匹配 BCP47 模式的开放 id。
+locale-settings.ts[FL8T]: F:locale 偏好 schema（宿主与浏览器共享线格式） | R:code:packages/client/locale/src/index.ts | A:两端 | S:LocaleSettingsSchema 同时是浏览器 scope 校验的线信封；preference 无值语义是委托浏览器而非默认 zh；id 模式允许 2-8 段 BCP47 形态。
+
+===D:/chengzi-pro/dsh-official/packages/client/product-analytics/src/===
+index.ts[AO6S]: F:Desktop 专属分析 RPC 与压缩事件采集 | R:code:packages/client/product-analytics/src/events.ts | A:宿主 productTelemetry 出口 | S:disabled 时 active=false：不检查身份也不接受新事件；session 的 compaction/start 映射为 context_compression（turn 为 null 即 manual 触发）；
+events.ts[FO7M]: F:产品事件名与挑选属性的封闭映射 | R:code:packages/client/product-analytics/src/index.ts | A:Desktop 埋点方 | S:ProductEventMap 是封闭白名单——事件名与属性形状必须先在此声明才可上报；含 onboarding/充值/模型切换/插件安装等字面量联合约束；
+
+===D:/chengzi-pro/dsh-official/packages/client/resources/src/===
+index.ts[EC9T]: F:资源模型宿主占位 | R:- | A:Loader 行 | S:apply 为空——资源模型整体住在浏览器导出面；此包存在只为让 Loader 出现该行。
+
+===D:/chengzi-pro/dsh-official/packages/client/file-upload/src/===
+index.ts[EP6S]: F:浏览器文件上传宿主服务：流式接收与暂存回执 | R:code:packages/client/file-upload/src/protocol.ts | A:client 附件 UI | S:上传走独立的认证原始字节 HTTP 路由而非 RPC 信封；PromptFileBinding 是 Disposable——未 commit 的绑定在 dispose 时回滚恢复先前 owner，只有投递真正 commit 才固化；
+protocol.ts[FN8T]: F:上传路由常量双形式 | R:code:packages/client/file-upload/src/index.ts | A:宿主路由与浏览器上传器 | S:FILE_UPLOAD_PATH=/api/session/uploadFileBinary，FILE_UPLOAD_ROUTE 是去首斜杠的浏览器相对形式，两半必须成对使用。
+
+===D:/chengzi-pro/dsh-official/packages/client/shortcuts/src/===
+index.ts[EC7T]: F:快捷键宿主配置注入 | R:code:packages/client/shortcuts/src/binding.ts | A:浏览器命令层 | S:经 webserver/index-inject 推全局 __DSH_SHORTCUTS_CONFIG__，页面加载即采纳序列时序配置；注入写法与桌面适配器侧镜像（jscpd 标注）。
+binding.ts[FU7S]: F:物理键协议与绑定规范化（无 DOM） | R:code:packages/client/shortcuts/src/native.ts | A:浏览器命令与桌面适配器 | S:primary 修饰符在 macOS 展开为 Meta、其余平台为 Control；keycode 白名单为 Key*/Digit*/F1-F24 与命名表，不支持的码在注册期即抛；双键组合必须互异且物理键排序；
+native.ts[FH7T]: F:Electron 顶框 preload 可信输入协议 | R:code:packages/client/shortcuts/src/binding.ts | A:产品主框 | S:每条原生输入携带已接受配置的 revision 防过期操作；closeWindow 仅当 revision 仍现行才真正关窗；frameName 标识持有焦点的 iframe 或 webview 嵌入元素；DesktopKeyboardApi 只暴露给产品主框。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-agent-preset/src/===
+index.ts[EU8T]: F:agent-preset 设置行表面插件 node 半 | R:- | A:Loader/cordis.yml | S:apply 恒为空只为 Loader 行可见；浏览器半经 package.json 的 dsh.client 声明从 exports[./client] 被发现——这是全部纯 UI 表面插件的统一装载机制。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-approval/src/===
+index.ts[EU8T]: F:审批呈现插件 node 占位 | R:- | A:Loader | S:浏览器专属呈现；Host 侧审批能力独立组合，本包不承载。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-attachment/src/===
+index.ts[EU8T]: F:附件呈现插件宿主占位 | R:- | A:Loader | S:client 半注册 React 槽位条目，宿主侧无行为。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-brand-official/src/===
+index.ts[EU8T]: F:官方浏览器品牌插件 node 占位 | R:- | A:Loader | S:仅贡献浏览器呈现，经 exports[./client] 装载。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-chat/src/===
+index.ts[EC7S]: F:Chat 偏好宿主注册 | R:code:packages/client/ui-chat/src/chat-settings.ts | A:浏览器 Chat 目标插件 | S:transcriptView/performanceUsage/linkOpening 三项 Volatile 投影浏览器；含 legacy transcript 视图模式常量做兼容；浏览器半含 assistant/command/compaction/turn 等 13 类会话节点定义与快照契约。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-commands/src/===
+index.ts[EU8T]: F:命令 UI 插件 node 占位 | R:- | A:Loader | S:宿主命令注册表本体由 bootHost+CommandUiRuntime 单独挂载，非本包；本包仅浏览器命令面板。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-conversation/src/===
+index.ts[EC7S]: F:会话偏好宿主注册（busyEnter） | R:code:packages/client/ui-conversation/src/submission-settings.ts | A:浏览器会话组装核心 | S:busyEnter Volatile 控制运行中按 Enter 行为；浏览器半是会话组装核心+React 适配器+输入插件主体（72 文件），含分组注册表与视图构建器契约。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-deliverables/src/===
+index.ts[EP6S]: F:交付物插件 node 半：文件引用提示与原生打开路由 | R:code:packages/deliverables/tool-present/src/index.ts | A:浏览器交付卡 | S:注入 FILE_REFERENCE_PROMPT 系统提示节，规范 markdown 文件链接格式（尖括号包路径、#L24 行锚、标签用文件名本身）；注册经认证的 present 声明文件原生打开路由；
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-directory-picker-browse/src/===
+index.ts[EU8T]: F:目录浏览选择表面 node 占位 | R:code:packages/host/directory-picker-browse/src/index.ts | A:Loader | S:列出/建目录原语在宿主 browse 后端；本包仅浏览器 UI 半。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-directory-picker-native/src/===
+index.ts[EU8T]: F:原生目录选择表面 node 占位 | R:code:packages/host/directory-picker-native/src/index.ts | A:Loader | S:OS 选择器在宿主 native 后端；仅当 directory-picker-auto 选定 native 对时与后端成对装载。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-dockkit/src/===
+index.ts[CG8M]: F:停靠布局引擎与 React 组件库 | R:code:packages/client/ui-dockkit/src/index.ts | A:sidebar 布局消费方 | S:引擎（applyOp/Sequencer/DockController）纯 TS 无 React/DOM/宿主概念——重放同一操作序列可复现同一树（每个操作自带其创建的 id）；组件对每个手势只报告一个已结算意图而非拖拽帧，嵌入方的序列是唯一真相；tab kind 是不透明字符串，kit 永不解释；文案经 DockLabels 注入。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-goal/src/===
+index.ts[EU8T]: F:Goal 表面插件 node 占位 | R:- | A:Loader | S:纯 UI 插件，浏览器半经 dsh.client 声明装载。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-input-trigger/src/===
+index.ts[EU8T]: F:斜杠触发器插件 node 占位 | R:- | A:Loader | S:纯 UI 插件；触发匹配逻辑在浏览器半。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-jobs/src/===
+index.ts[EU8T]: F:后台任务列表插件 node 占位 | R:- | A:Loader | S:浏览器半拥有全部贡献，含 job_output/job_kill 工具的结果呈现。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-layout/src/===
+index.ts[EU8T]: F:布局插件宿主占位 | R:- | A:Loader | S:浏览器专属布局插件，宿主零行为。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-message-feedback/src/===
+index.ts[EU8T]: F:消息反馈表面 node 占位 | R:- | A:Loader | S:纯 UI 插件。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-model-selection/src/===
+index.ts[EU8T]: F:模型选择插件 node 占位 | R:- | A:Loader | S:纯 UI 插件；模型清单与切换逻辑在浏览器半与 API 客户端。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-open-in-app/src/===
+index.ts[EU8T]: F:open-in-app 浏览表面 node 占位 | R:code:packages/host/open-in-app/src/shared.ts | A:Loader | S:驱动的三路由在宿主 open-in-app 插件；线格式常量经宿主包 ./shared 子路径共享。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-permission-presets/src/===
+index.ts[EU8T]: F:权限预设表面 node 占位 | R:- | A:Loader | S:浏览器半提供新建会话 Settings 行与当前会话命令选择器两处。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-plan/src/===
+index.ts[EU8T]: F:Plan 控制插件 node 占位 | R:code:packages/plan | A:Loader | S:plan 行为本体（/plan 命令、plan 投影、策略节）归 dsh-plan-mode 在宿主 roster 独立组合；本包只有 UI。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-plugin-manager/src/===
+index.ts[EN6S]: F:插件安装对话框的注册表探测宿主半 | R:- | A:浏览器安装对话框 | S:提供 pluginRegistryProbe Typert Remote——并行探测公共 npm 注册表比较版本；registryProbeEnabled 关闭即不可用；探测超时与结果缓存生命周期可配。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-primitives/src/===
+index.ts[CG8L]: F:Cordis-free React 原件库 | R:code:packages/client/ui-slots/src/index.ts | A:全部 UI 包 | S:样式只经 --dsw-* CSS 变量 token，不依赖 Cordis 与其他样式通道；组件全部从入口再导出（Button/Pill/Tag/Switch/SegmentedTabs/StateDot 等 88 个源文件）。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-reference/src/===
+index.ts[EU8T]: F:文件/会话引用插件 node 占位 | R:- | A:Loader | S:纯 UI 插件。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-renderer/src/===
+index.ts[EU8T]: F:UI 渲染器宿主占位 | R:code:packages/client/ui-renderer/src/client/index.ts | A:Loader | S:宿主零行为；渲染器整体在浏览器导出面。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-schedule/src/===
+index.ts[EU8T]: F:Schedule 目录插件 node 占位 | R:- | A:Loader | S:空 apply 使可选浏览器特性仍可从宿主 Loader overlay 寻址；37 个源文件均为浏览器半。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-session/src/===
+index.ts[EU8T]: F:Session UI 适配器宿主占位 | R:- | A:Loader | S:浏览器专属。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings/src/===
+index.ts[EC7T]: F:共享开发者工具偏好宿主注册 | R:- | A:浏览器设置页 | S:enabled Volatile 投影浏览器，控制开发者工具可见性；settings 命名空间 auto:false 由配置表单投影消费。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-account/src/===
+index.ts[EC6S]: F:账户设置宿主配置：联系人+设备本地引导进度 | R:- | A:浏览器账户页 | S:onboarding 进度（version/step/purpose）是设备本地 Volatile 状态而非服务端状态；CONTACT_CONFIG_GLOBAL 经 index-inject 在插件激活前发布联系人配置；含充值引导步骤与用途枚举（产品定制面）。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-agent-loop/src/===
+index.ts[EU8T]: F:Agent loop 设置页 node 占位 | R:- | A:Loader | S:页面编辑的 agent-loop 命名空间由 agent loop 本体注册，本包刻意不注册任何命名空间——命名空间所有权归功能插件是设置页家族的统一约定。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-general/src/===
+index.ts[EC7T]: F:通用设置宿主注册（欢迎公告版本） | R:- | A:浏览器设置页 | S:welcomeNoticeVersion Volatile 记录最后确认的公告版本，驱动是否再弹欢迎通知。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-models/src/===
+index.ts[EN6S]: F:Models 凭据引导宿主配置 | R:- | A:浏览器 Models 页 | S:ONBOARDING_CONFIG_GLOBAL 经 webserver/index-inject 在浏览器插件激活前发布凭据引导选择——发布时机是引导 UI 不闪烁的前提。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-plugin-inventory/src/===
+index.ts[EU8T]: F:插件清单页 node 占位 | R:code:packages/host/plugin-inventory/src/index.ts | A:Loader | S:数据来自宿主 plugin-inventory Remote；本包仅 inventory 标签页浏览器实现。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-plugins/src/===
+index.ts[EU8T]: F:插件设置表面 node 占位 | R:- | A:Loader | S:页面编辑的每个 section 归注册它的宿主插件所有，本包零命名空间。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-session-log/src/===
+index.ts[EU8T]: F:Session 日志上传偏好浏览器伴生 node 占位 | R:- | A:Loader | S:经 Client loader 挂载浏览器入口。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-shell/src/===
+index.ts[EU8T]: F:Shell 设置页 node 占位 | R:- | A:Loader | S:编辑的 shell 命名空间由 shell executor 注册，本包不注册。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-subagent/src/===
+index.ts[EU8T]: F:Subagent 设置页 node 占位 | R:- | A:Loader | S:编辑的 subagent 与 subagent-model-selection 命名空间归委派插件注册。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-settings-web-search/src/===
+index.ts[EU8T]: F:Web 搜索设置页 node 占位 | R:code:packages/web/web-search-deepseek/src/index.ts | A:Loader | S:编辑的 web-search-deepseek 命名空间归搜索 provider 插件注册；endpoint 变更即时生效于下一次搜索快照。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-shortcuts/src/===
+index.ts[EU8T]: F:快捷键浏览器半宿主占位 | R:code:packages/client/shortcuts/src/index.ts | A:Loader | S:键盘命令全在浏览器半执行，宿主零行为。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-skill/src/===
+index.ts[EU8T]: F:Skill 引用插件 node 占位 | R:- | A:Loader | S:纯 UI 插件。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-slots/src/===
+index.ts[CG8M]: F:槽注册表纯核：声明合并 SlotMap | R:code:packages/client/ui-slots/src/renderer.ts | A:全部表面插件与渲染器 | S:SlotMap 契约必须在宿主包词法内 declare module 合并——re-export 不参与合并（故 keyof SlotMap & string 的冗余类型豁免是有意模式）；零运行时依赖（仅 React 类型）；一次 register 同时贡献组件、可选子槽、store 座与登记方业务面。
+renderer.ts[CG7S]: F:槽宿主与渲染器间 React-free 契约 | R:code:packages/client/ui-renderer/src/client/index.ts | A:ui-renderer | S:LocaleFace 是 HostObservable（revision 递增）——locale 切换使 (ns,revision) 座派生全新 t 函数引用，memo 化组件自然重渲染；
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-subagent/src/===
+index.ts[EU8T]: F:Subagent 引用插件 node 占位 | R:- | A:Loader | S:纯 UI 插件。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-theme/src/===
+index.ts[EC6S]: F:主题偏好宿主注册与预插件调色板注入 | R:- | A:浏览器主题 scope | S:经 webserver/index-inject 在插件加载前注入主题全局防首帧闪烁；字号有 DEFAULT/MIN/MAX 常量；THEME_PREFERENCES 是封闭枚举。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-tool/src/===
+index.ts[EU8S]: F:Tool UI 插件（宿主占位+浏览器整调用组合） | R:- | A:Loader/浏览器会话视图 | S:浏览器半提供 keyed atomic Tool 视图契约与 user question 面板；40 个源文件全为浏览器半。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-trajectory/src/===
+index.ts[EU8T]: F:轨迹插件宿主占位 | R:code:packages/client/ui-trajectory/src/client/index.ts | A:Loader | S:浏览器专属，31 个源文件在 client 半。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-user-questions/src/===
+index.ts[EU8T]: F:Web 提问插件 node 半 | R:- | A:Loader | S:ask_user_question 工具挂 tools 全局层会扩每个 agent 的工具列表（无论 preset）；模型面工具归包含它的 preset 与 TUI 组合，本包只管 Web 呈现—— mounting 面 whose tool is whose 的边界在此文件头注释定死。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-workflow-run/src/===
+index.ts[EU8T]: F:持久 workflow-run UI 插件 node 占位 | R:- | A:Loader | S:特性整体在浏览器侧。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-workspace/src/===
+index.ts[EU8T]: F:工作区选择器插件 node 占位 | R:code:packages/client/ui-workspace/src/client/index.ts | A:Loader | S:浏览器半双注册：WorkspaceBrowser 填 sidebar.workspaces 洞、WorkspacePicker 填 conversation.hero.workspace 洞，并各自声明 single directory-flow 子槽给组合的 picker 包。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-sidebar/src/===
+index.ts[EU8T]: F:侧边栏插件宿主占位 | R:- | A:Loader | S:浏览器专属。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-sidebar-browser/src/===
+index.ts[EU8T]: F:内嵌浏览器侧栏宿主伴生 | R:- | A:Loader | S:仅挂载浏览器专属插件。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-sidebar-documentpreview/src/===
+index.ts[EC7T]: F:文档预览宿主配置注入 | R:code:packages/document/office-to-pdf/src/index.ts | A:浏览器预览面板 | S:经 index-inject 推全局 __DSH_DOCUMENT_PREVIEW_CONFIG__（缓存上限等页面加载即采纳）；79 个源文件几乎全为浏览器预览实现；PDF 渲染消费宿主 office-to-pdf 的 generation 校验防陈旧缓存。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-sidebar-files/src/===
+index.ts[EC9T]: F:文件树侧栏宿主占位 | R:- | A:Loader | S:纯宿主半——整个标签类型住浏览器导出面。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-sidebar-right/src/===
+index.ts[EC9T]: F:右侧栏宿主占位 | R:- | A:Loader | S:纯宿主半，Sidebar 整体在浏览器导出面（26 文件）。
+
+===D:/chengzi-pro/dsh-official/packages/client/ui-sidebar-terminal/src/===
+index.ts[EU8T]: F:交互终端侧栏宿主伴生 | R:- | A:Loader | S:经 Client loader 挂载浏览器专属插件。
+
+===D:/chengzi-pro/dsh-official/packages/credentials/authorization/src/===
+types.ts[FI8T]: F:授权对话类型词汇：通知/提示/结算状态 | R:- | A:authorization 服务与各 UI 面 | S:AuthorizationPrompt 的 secret 与 text 仅呈现差异（secret 会被掩码并排除在日志外）；prompt 自带 signal 用于撤回单个问题（竞态败者撤回），整个授权取消须走 request 的 signal；AuthorizationSettlement 的 failed 只存在于旁观者事件流——失败对发起调用方是抛错而非 outcome，旁观者靠它区分拒绝与故障。
+index.ts[II9L]: F:ctx.authorization 服务：凭据获取流注册与一键一会话 | R:code:packages/credentials/credentials/src/index.ts | A:平台账户 provider、配置 UI | S:每键同时只允许一个 attempt，第二调用者被拒（ALREADY_IN_FLIGHT）而非加入——避免两个界面替同一个人答问；AuthorizationDeclinedError 只能由人类的拒绝抛出，flow 用自身 signal 撤回 prompt 必须抛其他错误，否则后续真实失败会被误读为 decline；commit 后取消需等待完成（committing 状态 cancel 不中止）；begin 预检先行，signal 已中止也返回 cancelled 而不占槽；settle 在槽释放后发出，使监听者能立即开始下一次 attempt。
+
+===D:/chengzi-pro/dsh-official/packages/credentials/credentials/src/===
+index.ts[II9M]: F:凭据引用缝：Ref 解析与 Key 记录双键空间 | R:code:packages/credentials/credentials-local/src/index.ts | A:LLM provider、设置界面、webhook-github | S:缝级铁律：空存储值处处视为不存在（resolve 跳过、describe 报未配置），空白永不冒充已配置秘密；消费者必须每次操作重新 resolve，不得跨操作缓存——逐操作读取正是免重启换凭据的机制；modifyRecord 是记录唯一写路径（锁内读-判-写，跨进程互斥），这使双进程并发轮换 refresh token 不丢写；REF_PATTERN（POSIX 标识符）与 KEY 段语法经 / 分隔永不相交；事件只在提交后 fan out 且监听器同步抛/异步拒都被包含。
+types.ts[FI8S]: F:客户端安全凭据类型：品牌键与记录联合 | R:code:packages/credentials/credentials/src/index.ts | A:Remote wire、browser 类型链 | S:CredentialKey 的 scope 是拥有插件的注册名而非 provider 名——同 provider 的两个插件因此不互读 payload，卸载插件留下的孤儿可被识别；/ 分隔使两种键语法永不碰撞；ApiKeyRecord 两个字段都可缺省，表示所有者确认环境自认证——这与没有记录是两个事实；GrantRecord.payload 只约束能 JSON round-trip，缝与其他插件都不解释它。
+
+===D:/chengzi-pro/dsh-official/packages/credentials/credentials-local/src/===
+index.ts[PS9L]: F:文件型凭据 provider：.credentials.yaml 四层信任栈 | R:code:packages/credentials/credentials-local/src/index.ts | A:credentials 缝本地实现 | S:继承环境只读且赢过文档——写被影子时拒绝而非静默无效，入队后运行时重判；文档必须 0600，POSIX 启动即查 group/other 位越权即败（Windows 无模式可查故跳过）；YAML 错误只出 code+行列绝不引用源行——该行是密钥；文档锁等待 30s（token 轮换含网络往返，refs/records 共文件共锁故写者都等）；每次写前 reconcileFromDisk 防复活陈旧文档；热重载失败保留最后好快照不崩进程，启动时无效文档使激活失败而非当空库。
+
+===D:/chengzi-pro/dsh-official/packages/credentials/deepseek-account/src/===
+index.ts[II9S]: F:DeepSeek 账户服务定义：登录/钱包/登出抽象 | R:code:packages/credentials/deepseek-account-platform/src/index.ts | A:桌面 UI、web 面板 | S:PlatformSession 是 Host-only 凭据（origin/token/requestHeaders）绝不通过账户 RPC 暴露，userId 为 null 时要求一次性浏览器存储；resolveToken 只对 provider 允许的推理 origin 返回 token；signOut 本地先删 grant，远端撤销后台重试，远端失败永不恢复本地 grant；getProfile 的稳定 ID 首次可用或变化才通知 watch 消费者重读 getPlatformSession，重复 ID 保持静默。
+types.ts[FI8T]: F:客户端安全账户状态投影：不含凭据 | R:- | A:web/desktop 账户 UI | S:credential-stored 状态不代表服务端已验证 token；SignInErrorCode 是安全分类（no-response/network/protocol/expired/storage），经调用方 locale 字典渲染而非直显协议错误；钱包余额与奖金 amount 都是保留服务器精度的十进制字符串，amount 是授予额绝非剩余余额；session-expired 通知不重放。
+account-tasks.ts[MM7T]: F:登出时取消账户路由任务并发布登录指引 | R:code:packages/credentials/deepseek-account/src/index.ts | A:platform provider 构造器 | S:只取消 status 为 running 且最新绑定请求 provider 是 deepseek-account 的 agent；取消是 hook 类原因且 keepInbox:true；经 ctx.inject(['agents']) 延迟安装故 agent 可在之后附加。
+
+===D:/chengzi-pro/dsh-official/packages/credentials/deepseek-account-platform/src/===
+index.ts[II9L]: F:平台 PKCE 账户 provider：浏览器授权全流程 | R:code:packages/credentials/deepseek-account-platform/src/protocol.ts | A:authorization 缝、账户 UI | S:启动读 grant 时 issuer 与配置 origin 不匹配即删除；浏览器批准绝不绕过本地取消——committing 阶段不被 abort；浏览器返回 URL 必经 origin+固定 path 校验防任意跳转；requestHeaders 是 Host-only 部署头且 authorization 等保留名被拒、grant 不可被覆盖；inferenceOrigin 须为无凭据无路径的 http(s) origin；profile 缓存绑定 token——凭据更换后旧缓存不作答；dispose 等待全部后台撤销。
+protocol.ts[II9M]: F:平台 HTTP 消息校验与受限浏览器目标 | R:code:packages/credentials/deepseek-account-platform/src/index.ts | A:platform provider、details 查询 | S:platformOrigin 只收 HTTPS（loopback HTTP 须显式开发开关）且拒 userinfo/路径/query/hash；fetch 用 redirect:error；401 且带 x-dsh-auth-token 才映射 AccountUnauthorizedError；响应体有界读取；诊断只记 path/method/status 绝不记请求体或授权 URL；token 合并在部署头之后故 deployment 无法覆盖授权。
+details.ts[II8S]: F:平台 Web 档案与钱包查询投影 | R:code:packages/credentials/deepseek-account-platform/src/protocol.ts | A:账户 UI 的 profile/balance 读取 | S:金额十进制正则接受 big.js 语法（省略整数/小数部分、0E-16 类指数）——Platform Web 客户端就这么传；查询失败返回 status:failed 绝不渲染成零余额；AccountUnauthorizedError 向上穿透而其他失败都吞为 failed；未通知奖金的 msg 是服务端本地化文本直接可显示，client 的 locale 只选服务端文案语言。
+logout.ts[MM8T]: F:有界后台 token 撤销与指数退避 | R:code:packages/credentials/deepseek-account-platform/src/index.ts | A:signOut 后台流程 | S:纯内存撤销——绝不改本地账户状态，token 是已删除的那个，绝不换成后续登录的 token；HTTP/业务/传输失败都消耗一次重试且不抛出，远端失败停留在后台；重试延迟按 2 的幂翻倍，provider 生命周期 signal 中止即静默返回；signal 与每请求超时 AbortSignal.any 合并。
+types.ts[FI5T]: F:平台 provider 复用账户服务客户端类型 | R:code:packages/credentials/deepseek-account/src/types.ts | A:- | S:纯 re-export 叶：平台 provider 无自有 wire 类型，账户状态客户端安全投影全部来自 dsh-deepseek-account/types。
+
+===D:/chengzi-pro/dsh-official/packages/settings/settings/src/===
+index.ts[AC9L]: F:设置表单服务：Config 模式投影与修订控制写入 | R:code:packages/settings/settings/src/redact.ts | A:settings UI、Remote wire | S:路径式编辑为持有脱敏视图的调用方存在——全量 replace 会静默删除 wire 上从未返回的 secret；写入走乐观锁 revision，陈旧编辑以 SETTINGS_CONFLICT 拒绝；cloneJsonShaped 单趟拒 Date/Map/BigInt/循环/非有限数——否则 YAML 往返静默失真；对象 undefined 条目跳过、数组的拒绝；mergeLayers 对象递归合并数组整体替换；旧 settings.yaml 先 rename 再导入故部分导入不重复。
+redact.ts[MS9S]: F:role('secret') 字段结构化脱敏 | R:code:packages/settings/settings/src/index.ts | A:settings 描述读取、wire 边界 | S:sidecar 记录每个 secret 位置及是否有值——表单因此能渲染 write-only 输入而不接触值本身；union/intersect 分支保守处理：任一分支声明 secret 即删除；对象属性槽位即使未设值也枚举（表单知道槽位存在）而 dict/数组只列值里实际有的；路径含具体 dict 键与数组下标；输入永不突变，同一路径多分支声明取 set 的或。
+schema.ts[MS7T]: F:从 Config 模式派生可编辑表单与纯值 | R:code:packages/settings/settings/src/redact.ts | A:settings 表单投影 | S:secret 字段的 meta.default 与 required 被删除——默认值本身可能就是 secret；非 secret 字段的 default 也会先过 redactSecrets；
+types.ts[FC7T]: F:设置 wire 视图：命名空间视图与路径编辑 | R:- | A:Remote 客户端 | S:视图总是脱敏后读取；revision 必须作为 expectedRevision 回传，否则写入被拒；user 层某字段的存在即标记用户覆盖（与值是否相同无关）；
+
+===D:/chengzi-pro/dsh-official/packages/workspace/workspace/src/===
+index.ts[DD9L]: F:工作区注册表：持久记录与 header 校验会话成员 | R:code:packages/workspace/workspace/src/spec.ts | A:会话持久化、webhook、web UI | S:启动强制依赖 sessionPersistence——不可用对等体不能被误当空历史而提交 initialized 标记；一次性历史引导只在注册表与 Session 历史都空时执行；删除默认工作区注册即永久禁用自动创建（id 仍保留）；archiveSession 先写档案再请求 provider 停止活动，不等待运行工作收尾，provider 失败只记日志不回滚归档；归档拒绝发生在任何写入之前（活动侦听返回非空即拒）；pendingMutation 两写标记持久化在记录/顺序可分歧之前，使启动能区分中断操作与介质损坏。
+entity.ts[DD8M]: F:工作区实体：单一 Workspace 实现 | R:code:packages/workspace/workspace/src/index.ts | A:registry 内部（不导出） | S:record 快照在每次持久变更后原位换入，全部写入收口私有 mutate——updatedAt 盖章与失效候选修剪恰好一次；attachSession 对已入账 id 跳过 cwd 重验证（存储 header cwd 与工作区路径都不可变）；
+paths.ts[KD8T]: F:路径规范化：工作区身份唯一准则 | R:- | A:workspace create/attach | S:realpathNormalize 是全包唯一身份准则——存储路径、唯一性（符号链接到已有工作区目录即冲突）、attach cwd 校验全走它；相对路径在 realpath 前拒绝，否则会从 Host cwd 或当前 Windows 盘符解析；Windows 判 fully-qualified 要求真实盘符根而非裸反斜杠或正斜杠；
+spec.ts[FD8S]: F:workspace 域声明：记录 schema 与 defineDomain spec | R:code:packages/storage/storage-domain/src/spec.ts | A:storageDomain.open | S:archivedSessionIds 中的会话保留 sessionIds 槽位（unarchive 须恢复位置）故档案集绝不参与单主记账不变量；pin 与 archive 互斥——归档丢弃 pin；两集合带 default 使老记录可解析；pendingMutation 需在记录/顺序写之前持久化；域版本 2，zod schema 是耐久边界校验兼未来 RPC 投影源。
+types.ts[FD6S]: F:Workspace 公共接口与活动词汇 | R:- | A:UI 与注册表调用方 | S:WorkspaceId 是生成 uuid 而非路径——路径规范化会重写路径而引用锚必须稳定；
+
+===D:/chengzi-pro/dsh-official/packages/storage/storage/src/===
+index.ts[CD9S]: F:存储枢纽：后端注册表与数据 form 挂载 | R:code:packages/storage/storage/src/registry.ts | A:domain 层、json/sqlite 后端 | S:hub 自身零 IO——后端拥有介质、form 拥有语义；storageBackendServiceKey 生成生命周期服务键使 domain 激活不与后端注册竞速；包只 default-export 服务类——混入函数插件 apply 会让 Loader 丢弃插件命名空间；挂载/注册都是 effect，过期 disposer 有同身份守卫。
+backend.ts[FD9S]: F:后端契约词汇：KV facet 与单元描述符 | R:code:packages/storage/storage-json/src/index.ts | A:后端实现者与契约测试 | S:UNIT_NAME_RE 保证名字可作文件名与 SQL 标识符段（免转义）；单元不串行化并发写——写序是调用方（domain 写链）责任；每次单调用原子且 resolve 后崩溃重开可见；per-record 布局键成为路径段须匹配字母数字下划线连字符（不安全键写入即拒），single 布局键保持不透明；compatibleVersions 只放宽 per-record 读取（版本不接受的记录文档被丢弃而非迁移），single 读取严格版本；双开同名单元是调用者 bug 必拒。
+error.ts[FD6T]: F:StorageError 稳定错误码词汇 | R:- | A:hub 与后端实现 | S:code 是消费者可 switch 的稳定契约，message 只是诊断散文；version-mismatch/malformed-medium 等后端失败以 StorageError 原样穿透到 domain 层不被重包。
+registry.ts[CD8T]: F:命名后端注册表：多后端并排 | R:- | A:storage hub | S:dispose 不关闭后端——拥有插件在注销后自关；过期 disposer 守卫使 dispose 后重注册场景下旧 disposer 再次触发不会移除继任者；哪个后端服务哪个消费者是消费者侧配置（domain 路由表）绝非 hub 全局选择。
+
+===D:/chengzi-pro/dsh-official/packages/storage/storage-domain/src/===
+index.ts[AD9M]: F:domain form 挂载：打开校验域与路由 | R:code:packages/storage/storage-domain/src/domain.ts | A:各 defineDomain 消费包 | S:open 每步失败整体拒绝；invalidRecords 的 backup-and-skip 仅当后端实现 backupRecord 才生效，global 槽永远走拒绝路径；存储 null 全局意味着从未写入——serve initial 而不物化，首个 set 才落盘；调用方拥有句柄并负责 close（通常挂自己的 effect）；任何失败都无条件释放域名预留（注册后不可能再抛）；打开中途失败会关闭已开 unit 防泄漏。
+domain.ts[PD9M]: F:域运行时：单写链与变更事件发射 | R:code:packages/storage/storage-domain/src/events.ts | A:所有 domain 消费方 | S:写序铁律：先等后端持久、再改内存、再发事件——被拒的写不动内存（读与介质无分歧）；事件值等于发射时内存态且按写序到达；emitChanged 吞同步监听器异常——提交点已过，通知非事务参与者；close 三阶段：立即拒新写、排空已排队写（事件照发）、关 unit 后 onClosed 才释放域名；get/entries 返回存储对象本身无防御拷贝，消费方不得原位修改须走 put/update；delete 幂等且缺席时不写不发事件。
+spec.ts[FD9S]: F:域声明词汇：defineDomain 校验与投影 | R:- | A:各域 owner 包 | S:defineDomain 在模块加载即 fail loud——坏域名/表名/版本/布局在触碰介质前抛出；global schema 若接受 null 会被拒绝：后端以 null 作从未写入哨兵，可空全局会在重开时静默回退 initial；compatibleVersions 条目必须为小于当前版本的非负整数；invalidRecords 只允许 backup-and-skip；域名兼作后端单元名。
+error.ts[FD6T]: F:DomainError 码表与 invalid-record 定位 | R:- | A:domain 层消费方 | S:后端失败（backend-not-found、version-mismatch 等）以 StorageError 原样穿透——domain 层不重包；detail 仅在 code 为 invalid-record 时存在，table/key 为空串表示 global 单例槽。
+events.ts[FM7T]: F:domain/changed 事件词汇 | R:- | A:跨进程变更推送（RPC 帧） | S:事件只在后端确认持久后按写序发射；删除是墓碑不带 value——diff 消费者须自留前照；table/key 空串判别 global 写；观察者失败被包含且记日志，不可能使已提交写看起来失败。
+
+===D:/chengzi-pro/dsh-official/packages/storage/storage-json/src/===
+atomic.ts[PR8T]: F:JSON 后端原子整文件替换 | R:- | A:storage-json 两个 unit 类 | S:语义是替换而非不覆盖——与 session-log 的 link+unlink 不覆盖协议不同，单元文件每进程单写者 last-write-wins 正确；Windows 上 libuv 把 rename 映射为 MoveFileExW REPLACE_EXISTING；POSIX 在 rename 后 fsync 父目录才崩溃持久，Windows 直接跳过（O_RDONLY 打开目录被拒）；失败路径尽力删 temp 但原错误优先。
+format.ts[PD8S]: F:单元磁盘格式：序列化/解析与版本戳 | R:- | A:storage-json unit 类 | S:parse 拒绝 tables 为数组——否则所有声明表被报缺失、下次发布会用空视图覆盖文件造成静默丢数据；single 布局版本不匹配抛 version-mismatch（恰一个文档故拒绝而非迁移）；
+index.ts[PD8S]: F:JSON 后端：每单元一文档或一记录一文档 | R:code:packages/storage/storage-json/src/single-unit.ts | A:storage hub 注册 json | S:config.root 故意无默认——process.cwd() 回退会把单元文件散落进程启动处，装配必须显式声明；双开单元抛普通 Error 而非 StorageError（调用者 bug 非介质状况）；opening 槽在首个 await 前同步预留使并发同名单开必拒；close 与 in-flight open 竞速时关闭新 unit 绝不交出越过 close 的活句柄。
+per-record-unit.ts[PD8M]: F:per-record 布局单元：目录即状态 | R:code:packages/storage/storage-json/src/format.ts | A:json 后端 | S:单元自身零内存状态——loadAll 重读树、每写一次持久文件操作，真内存由 domain 层持有并串行化写故无需回滚；
+single-unit.ts[PD8S]: F:single 布局单元：内存权威+整文件原子发布 | R:code:packages/storage/storage-json/src/atomic.ts | A:json 后端 | S:写不在此排队——写序归调用方 domain 写链；发布失败回滚内存（否则被拒写存活在内存并搭下次发布的车落盘）；close 先排空 inFlight 发布再触发 onClose；缺文件即空单元，物化推迟到首次写。
+
+===D:/chengzi-pro/dsh-official/packages/storage/storage-sqlite/src/===
+index.ts[PD8S]: F:SQLite 后端：一库多单元文档每行 | R:code:packages/storage/storage-sqlite/src/schema.ts | A:storage hub 注册 sqlite | S:ready 的打开失败被预 catch 防 unhandled rejection，但每个原语 re-await ready 故失败仍会到达每个调用者；单元名槽同步预留防并发同名单开竞速过守卫；POSIX 模式文件系统上目录与库文件 owner-only 创建，已存在路径保留原 mode；后端不防护能替换父目录中数据库条目的其他主体——保密性与完整性以此为界。
+schema.ts[PD8S]: F:SQLite 打开序列与布局版本 | R:- | A:sqlite 后端 | S:PRAGMA user_version 是物理布局版本（当前 1），与每单元 version 正交；非 0 且非当前值直接拒绝——未发布格式无迁移；journal 模式排除 memory/off——降级日志持久性静默违背 KV 契约的持久条款；user_version 最后盖章：盖章断言布局完整，阻塞清除后重开从头物化；
+unit.ts[PD7S]: F:SQLite KV 单元：预编译语句每原语单条 | R:- | A:sqlite 后端 materializeUnit | S:原子性来自 SQLite 单语句——无显式事务无写队列；loadAll 用 null 原型对象装记录，__proto__ 键落自有属性不污染原型；存储值 JSON 解析失败映射 malformed-medium；
+
+===D:/chengzi-pro/dsh-official/packages/fs/fs/src/===
+index.ts[CD9M]: F:文件系统缝：ctx.fs 抽象 provider | R:code:packages/fs/fs-local/src/index.ts | A:tool-fs/tool-str-replace-editor/fs-sandbox | S:write-intent 与 edit-intent 是单槽 waterfall——第一个返回 intent 的监听者独占决策，调 next() 即弃槽；fs/observed 监听器必须同步：抛错炸工具调用、返回 promise 不被等待；targetKey 是不透明身份绝不可解析或假设为本地绝对路径；processPath 与 targetKey 故意分离；editText 留在缝内使版本检查/字面匹配/重写共享同一临界区；resolve 可能做 IO 故恒为 async。
+types.ts[FD8M]: F:fs 缝词汇：品牌身份与守卫意图 | R:- | A:fs 各实现与工具层 | S:FsVersion 是新鲜度令牌（本地后端由 dev/ino/size/mtimeNs/ctimeNs 高精度组成），消费者只可展示不可解释；absent 观察只授权受守卫的 create 绝不授权 edit；writeText 省略 intent 即无条件 create-or-overwrite 而非第三分支；
+
+===D:/chengzi-pro/dsh-official/packages/fs/fs-local/src/===
+fsio.ts[PS9L]: F:Cordis-free 本地文件机制：读取/原子写/编辑 | R:code:packages/fs/fs-local/src/win32.ts | A:LocalFileSystem | S:写经私有同级 staging 目录（0700）加独占临时文件再原子发布：POSIX 硬链接不覆盖，Windows ReplaceFileW 保 ACL；目标缺失时 realpath 最近存在祖先再补缺尾——键在祖先目录创建前后稳定；ENOTDIR 与 ENOENT 同样视为目标不可能存在（Windows 把 file/child 报成 ENOENT，靠 stat 祖先恢复语义）；readForEdit 拒二进制（含 NUL）并返回原始行尾风格供回写；匹配前双方做 CRLF 到 LF 规范化。
+index.ts[PD9M]: F:宿主文件系统实现：realpath 身份与 per-key 锁 | R:code:packages/fs/fs-local/src/fsio.ts | A:fs 缝装载、fs-sandbox 继承 | S:cwd 只是解析默认绝非包含边界——包含须换更严后端或权限插件；per-targetKey FIFO 锁串行化全部变更操作使并发写确定排序（一赢、余者见新版本判 stale）；符号链接文件写入更新其目标而不替换链接；身份即 realpath——别名共享陈旧守卫；diffBasisMaxBytes 默认 10MiB、上限受 bufferConstants 约束，构造期校验正 safe integer；watch 单文件时挂在父目录再用 ignored 过滤（depth 0）。
+win32.ts[PS8S]: F:Windows DACL 复制与安全替换原语 | R:- | A:fsio 原子发布 | S:koffi 惰性加载使非 Windows 进程永不打开 Win32 库；ReplaceFileW 保留被替换文件的 ACL 等替换元数据；copyFileDacl 附 PROTECTED_DACL 旗标防从 staging 父目录继承 ACE——调用时目标必须仍为空才保机密；Win32 错误映射为 ENOENT/EACCES/EIO 并保留原始 win32Code 供诊断；API 路径经 toNamespacedPath 处理长路径。
+
+===D:/chengzi-pro/dsh-official/packages/fs/fs-sandbox/src/===
+index.ts[MS9S]: F:沙箱强制文件系统：每调用策略栅栏 | R:code:packages/sandbox/sandbox/src/roots.ts | A:fs 缝装载（替代 fs-local） | S:是可信代码里的策略检查、模型控制路径——非内核边界，代码级隔离是 ctx.shell 的职责；残余 TOCTOU（祖先符号链接在复查与 syscall 间被换）被显式接受并靠「检查返回的新鲜 target 即被改写的 target」收窄——绝不检查此写彼；workspace-write 下写前重 resolve 反映并发换链；拒绝抛 FS_SANDBOX_DENIED 由工具层映射模型面 sandbox 标记与升级提示；读在所有模式放行；defaultMode 来自 ctx.sandboxPolicy 是对外 advertised 的能力事实。
+containment.ts[KS8T]: F:路径包含判定：词法快路+身份回退 | R:- | A:fs-sandbox checkedTarget | S:拼写不同时逐级 stat 祖先比对 dev/ino——识别 Windows 8.3 短名与大小写别名而不弱化为文本近似；root 不存在或不可 stat 返回 false（保守，缺失根匹配不到任何东西）；大小写敏感性默认按平台（win32 不敏感）；词法前缀比对带分隔符边界防 foo-bar 误含于 foo。
+
+===D:/chengzi-pro/dsh-official/packages/fs/fs-observation-policy/src/===
+index.ts[MS8S]: F:观察态门：三 fs/* 决策的事件插件 | R:code:packages/fs/fs/src/index.ts | A:tool-fs 的守卫派生 | S:观察状态 WeakMap 以 actor 的 agent.session 为 owner（弱持有——会话回收即释放状态）；无法派生 owner 的直调可自由读但无法满足写/改的先读策略；writeIntent：未见/确认缺席给 createIfAbsent、确认在场给 replaceIfVersion；
+types.ts[FB5T]: F:观察态 actor 结构视图 | R:- | A:index.ts owner 派生 | S:刻意不 import dsh-tools/dsh-agent/dsh-session——只声明 agent.session 的最小结构并作不透明 WeakMap 键使用，永不读取其任何字段；工具直接把自己的 exec 传作不透明 object actor。
+
+===D:/chengzi-pro/dsh-official/packages/fs/tool-fs/src/===
+index.ts[IU9T]: F:read/write/edit/read_image 工具注册 | R:code:packages/fs/tool-fs/src/sandbox.ts | A:ToolRuntime | S:read_image 仅当 attachments 挂载才注册——部署无法持久化图像字节就不提供工具（execute 内还有防御性复查）；四个读上限配置必须正整数，否则窗口算术会静默出错；一个 FsSandboxController 实例由 write/edit 共享，是否 confines 由 ctx.fs.sandboxMode 判定。
+error.ts[MU7T]: F:守卫失败的模型面诊断补救 | R:- | A:write/edit 工具 catch | S:FS_NOT_OBSERVED 的操作特定文案统一替换为先读再试；FS_STALE_VERSION 保留 provider 原因并追加重读补救；原错误作为 cause 保留且 code 不变供机器路由；其余错误原样穿透不做包装。
+session-cwd.ts[MC6T]: F:会话工作区 cwd 派生 | R:- | A:各 fs 工具 | S:cwd 取自 exec.agent.session.header.cwd 而非 process.cwd()——非 agent 调用返回 undefined 让 provider 应用自身默认，工具边界刻意不读 process.cwd()；携带沙箱策略时 policyWorkspaceRoot 优先于会话 cwd。
+read-target.ts[MU6T]: F:读工具共享路径解析与文件校验 | R:- | A:read/read_image | S:解析后 stat 缺席时先发 fs/observed absent 事件再抛 FS_NOT_FOUND——观察记录先于失败；非正则文件（目录/特殊文件）抛 FS_NOT_REGULAR_FILE；
+read.ts[IU8M]: F:read 工具：窗口化行号读取 | R:code:packages/fs/tool-fs/src/read-render.ts | A:ToolRuntime | S:READ_LIMIT=2000 既是默认 limit 也是硬上限（超过即参数错误）；offset 为 1-based，超过 EOF 抛 FS_NOT_FOUND；STREAM_MIN_SIZE=10MiB 及以上或大小未知走流式防整载内存；presentationMeta 把结构化窗口投影进持久 meta——线上只传模型面文本，行号/语言数据无法从文本恢复故 UI 读卡重放依赖 meta。
+read-render.ts[KU8M]: F:纯读呈现：有界窗口构建 | R:- | A:read 工具 | S:行缓冲上限是 maxLineLength+1——仅一个字符即可证明行溢出，因此无换行的巨型单行也不能无界占内存；字节上限触断标 truncatedByBytes 并输出 offset=endLine+1 续读页脚；截断后仍继续扫描以得出精确 totalLines；offset 超过 totalLines（非首页）抛 FS_NOT_FOUND；行级截断附 line truncated 提示后缀。
+read-image.ts[IU7M]: F:read_image 工具：签名识别与能力门 | R:- | A:ToolRuntime（attachments 挂载时） | S:路由能力门刻意比宿主上传预检更严——须解析出精确调用 route 且其显式声明 image 输入模态，未知能力直接拒绝而非依赖适配器在 IO 后失败；
+write.ts[IU8S]: F:write 工具：守卫全文件写 | R:code:packages/fs/fs-observation-policy/src/index.ts | A:ToolRuntime | S:空 content 合法（写空文件），仅 file_path 非空白被校验；不做单独 stat——intent 来自单槽策略事件、原子守卫由 provider 承担；escalation 字段只在 confining 后端时进 schema（否则模型传参在 execute 前即被校验器拒绝）；presentationMeta 的 diffs 为空数组时 UI 靠 operation 区分 create 与未变覆盖。
+edit.ts[IU8S]: F:edit 工具：字面替换默认唯一匹配 | R:code:packages/fs/fs-local/src/fsio.ts | A:ToolRuntime | S:old_string 与 new_string 相等参数期即拒（保证无操作的编辑）；old_string 空串拒绝而 new_string 可空（空串即删除匹配）；replaceAll 缺省 false，此时多匹配由 provider 层抛 FS_AMBIGUOUS_EDIT 而非替换第一个。
+sandbox.ts[MS8S]: F:fs 升级 API：批准序列与拒绝映射 | R:code:packages/sandbox/sandbox/src/escalation.ts | A:write/edit 工具 | S:confining 后端但 ctx.sandboxPolicy 缺失在构造期抛错（fail loud）；策略解析顺序：已批准升级 grant 优先于会话常驻模式再优先于后端默认，且调用会话 cwd 恒作 workspace 根；重复常驻模式不需批准；
+diff.ts[KU6T]: F:结果时上下文 diff 卡片 | R:- | A:write/edit presentationMeta | S:3 行上下文（DIFF_CONTEXT=3）；统一 diff 的反斜杠 no-newline 标记属于 patch 注释被显式跳过，绝不泄入 diff 块；
+
+===D:/chengzi-pro/dsh-official/packages/fs/tool-fs-search/src/===
+index.ts[IE8S]: F:glob/grep 搜索工具套件注册 | R:code:packages/fs/tool-fs-search/src/search-core.ts | A:ToolRuntime | S:刻意注入 subprocess 而非 fs——发现是 rg 进程工作流而非 ctx.fs 方法，绝不经 ctx.shell、绝不做模型可见后台任务；spillStore 用 ctx.get() 机会式读（可缺）；返回路径按 workdir 相对显示，仅当 workdir 与 fs read 根同工作区（co-located 部署）才保证可续读——文档化 v1 部署要求，运行时不校验。
+search-core.ts[IN9L]: F:rg 执行管线：包装二进制与输出预算 | R:- | A:glob/grep 工具 | S:rg 随 npm 包分发无 shell 层——argv 直达进程无引号问题；单文件运行时用 -rg sidecar（虚拟 FS 内无法 spawn 原生 helper），Node 模式回落平台包，惰性解析每进程一次；stdout 只解析 rawOutputMaxBytes（默认 20MB）内完整内存输出——保留不下即 OVERFLOW 失败而非静默解析残流；rg exit 1 是零结果成功；meta 上限 64KiB——meta 随会话日志持久且每请求重发，spill 策略只缩 content 不缩 meta。
+glob.ts[IU8M]: F:glob 工具：rg --files 按修改时间 | R:code:packages/fs/tool-fs-search/src/search-core.ts | A:ToolRuntime | S:每个 VCS 目录名用两个否定 --glob：剪枝 glob 在遍历中跳目录，双星斜杠 glob 在搜索根恰在该目录内（显式 path 指向 .git）时补刀——单剪枝对根内路径永不命中；--no-ignore --hidden 意味着 ignored/hidden 文件也列出；
+grep.ts[IU8M]: F:grep 工具：rg --json 行级匹配 | R:code:packages/fs/tool-fs-search/src/glob.ts | A:ToolRuntime | S:固定 --json NDJSON 使 path/行号/行文本解析无冒号劈裂歧义；include 只许单个正向 glob——否定感叹号前缀与顶层逗号列表被拒（花括号 a,b 交替合法，逐字符跟踪括号深度）；pattern 允许纯空白（空白是合法 regex）；畸形 --json 记录是 SEARCH_FAILED 而非部分结果；
+ripgrep.d.ts[FV4T]: F:@vscode/ripgrep 最小类型声明 | R:- | A:search-core resolveRgPath | S:该包是 ESM 且无自带类型；
+direct-call.ts[MU5T]: F:搜索结果 spill 的直调后选判定 | R:- | A:glob/grep postTool | S:仅当同时满足四条件才投影规范值：决策 accept 且无下游内容或 value 替换、exec 是顶层调用（无 parent）、exec.
+presentation.ts[MU7M]: F:搜索卡投影：值不走线只走 meta | R:- | A:两工具 presentResult | S:规范值从不跨 wire——UI 渲染的结构化形状必须骑 JSON meta；投影与模型面文本消费同一批保留结果（retainGrepMatches/retainGlobPaths），卡与文本对截断存活完全一致；
+
+===D:/chengzi-pro/dsh-official/packages/sandbox/sandbox/src/===
+index.ts[CS9M]: F:同世界进程禁闭缝：ctx.sandbox 契约 | R:code:packages/sandbox/sandbox-local/src/index.ts | A:bash 工具、fs-sandbox 等消费方 | S:策略按调用携带而非 provider 固定——两个消费者可同时不同政策（bash read-only 而受限子代理需状态目录可写）；ConfinedArgv 携带 enforcement 与 denialSignatures（后端方言：bwrap 是 EROFS 文本、Landlock 是 EACCES、Seatbelt 是 EPERM）——消费者须精确匹配本后端方言而非跨后端并集，并集会声称该后端从不产生的拒绝；缺后端 fail closed 抛 SANDBOX_UNAVAILABLE 绝不返回原 argv。
+escalation.ts[MS9S]: F:升级词汇：严格加宽阶梯与 fail-closed 批准 | R:- | A:bash 与 fs 两工具家族 | S:WIDER_MODES 只在执行期检查——schema enum 用全 ESCALATION_TARGETS（read-only 是地板无升级目标），因 schema 注册表全局而有效模式是每调用事实；按部署默认裁剪 enum 会使 danger-full-access 默认下的窄切换会话无从升级；approval 通道是结构形状（EscalationAsk）非服务类型——本包因此不依赖 approval/agent 包，工具层闭包 ctx.approval 传入；拒绝标记与升级提示是两族共训词汇，模型据此以同构方式识别与重试。
+roots.ts[KS9T]: F:可写根推导的唯一家 | R:- | A:Seatbelt profile 与 fs fence | S:workspace-write 等于工作区根加 /tmp 加 os.tmpdir() 三者 canonical 化去重——两执行方言共用此推导，杜绝 fs 写不了 /tmp 而 bash 能的不对称；用 realpathSync.native 而非 JS 实现（后者在某些平台先词法折叠 .. 再解析前导符号链接）；解析失败原样返回——缺失根匹配不到任何东西是保守结果，绝不发明回退授权。
+diagnostics.ts[KO6T]: F:runner 失败与文件拒绝分类 | R:- | A:sandbox-local 消费方 | S:仅在独立排除 caller cwd 不可用后，才把 Node ENOENT/EACCES 且 error.path 恰等于 argv[0] 的失败归于 runner 可执行——cwd 检查与 spawn 非原子，并发路径替换可改归属但绝不会放行未禁闭执行。
+
+===D:/chengzi-pro/dsh-official/packages/sandbox/sandbox-local/src/===
+index.ts[IS9L]: F:本地沙箱后端：平台 runner 链选择与功能探测 | R:code:packages/sandbox/sandbox-windows-acl/src/index.ts | A:ctx.sandbox 本地实现 | S:Linux 链 bwrap 后 Landlock、macOS Seatbelt、Windows ACL——每 wrap 功能性探测一次（真实 profile 跑 true）非版本嗅探；探测失败 fail closed 不返回原 argv；windows-acl 报 partial：NTFS 硬链接跨路径别名同文件、读不设限、他工具 ACL 树 Low 完整性子读不了；workspace SID 常驻（精确 ACE 跳过使后续 provision 均摊 O(1)），temp 每 session 随机 dispose 撤销；runnerCommand 覆盖须配失败签名。
+profiles.ts[FS8T]: F:平台 profile 构建：bwrap/Landlock/Seatbelt | R:code:packages/sandbox/sandbox/src/roots.ts | A:sandbox-local wrap | S:Seatbelt 可写根来自共享 writableRoots（canonical 去重）——与 fs fence 永不漂移；bwrap 的 workspace-write 是 /tmp tmpfs 挂载加工作区 bind，且 --unshare-pid --die-with-parent；SBPL 字符串转义反斜杠与引号；模式是 deny file-write* 全拒再逐根 allow，/dev/null 恒可写。
+
+===D:/chengzi-pro/dsh-official/packages/sandbox/sandbox-policy/src/===
+index.ts[AC9S]: F:沙箱策略家：部署默认与每会话解析 | R:code:packages/sandbox/sandbox-policy/src/session-mode.ts | A:bash/fs/terminal enforcing 后端 | S:默认 read-only（fail-safe）——workspace 可写须部署显式 opt-in；每请求前把已解析政策贡献进缓存安全的 runtime-context 快照——agent loop 把快照记入模型历史，重放重建同模式同根而无需改稳定系统提示；runner 选择不在此（那是 ctx.sandbox 的配置）；workspaceRoot 保持执行世界拼写——enforcing provider 在自己主机上解析身份；resolve 每操作边界读一次会话态，executor/provider 保持无会话。
+session-mode.ts[MC8T]: F:会话级模式覆盖：会话日志即存储 | R:- | A:UI 策略控件与 delegation | S:覆盖是一个 sandbox/mode 事件（log-only 如 approval/*，绝不进模型转录）——切换即事件，无带外状态突变；effective 等于投影态或部署默认——重启经重放存活、两会话永不见彼此状态；对下一个受禁闭调用生效；source 为 delegation 标记子代理种子覆盖；模式是 bash 与 fs 共享的政策状态故住在策略包而非任一能力缝。
+
+===D:/chengzi-pro/dsh-official/packages/sandbox/sandbox-windows-acl/src/===
+index.ts[IS9L]: F:Windows ACL 限制令牌沙箱 | R:code:packages/sandbox/sandbox-windows-acl/src/token.ts | A:sandbox-local win32 链 | S:WRITE_RESTRICTED 只交叉写访问——读/网络/进程可见性不受限；工作区 SID 确定性派生使 ACE 一次物化跨会话存活（刻意永不撤销——撤销迫全树重传播）；temp SID 每目录随机 dispose 撤销；任何 API 失败带 API 名与 Win32 码抛出——子进程绝不被无限制 spawn；写受限交叉只覆盖对象自身检查，故令牌降 Low 且授权目录带 no-write-up 标签与删除 deny；控制台隔离不可用。
+acl.ts[PS9M]: F:能力 SID 的 ACE 授予/撤销 | R:- | A:grant.ts 与 runner | S:每次 grant 一次调用三编辑：allow ACE 加撤 FILE_DELETE_CHILD 的 world Deny（防经父目录删除权逃逸）加 Low no-write-up 标签；get-merge-set 在每路径 LockFileEx 互斥下防并发实例互踩 ACE；锁文件名取小写路径 sha256 前 16 hex 且共享读写不共享 delete——可删锁可被换掉使两进程同持同一锁；ACL 指针在安全描述符分配内部——只可 free 描述符且须等 SetEntriesInAclW 消费后（先 free 会堆损坏）。
+token.ts[PS8M]: F:受限令牌构造与 logon SID 提取 | R:- | A:index.ts AclSandbox | S:每一个 Win32 调用都检查——原 POC 忽略全部失败静默以全权令牌跑子进程；logon SID 扫描 TokenGroups 需 SE_GROUP_LOGON_ID 位且 bit31 置位必须无符号比较（JS 按位与是 32 位有符号）；GetCurrentProcess 伪句柄不能经 koffi 寻址故走真实 OpenProcess；受限令牌默认 DACL 合并 full-access allow ACE 使新对象对持有者可用。
+workspace-sid.ts[KS8T]: F:工作区/临时写 SID 派生 | R:- | A:grant.ts/runner.ts | S:workspace SID 是 canonical 路径 sha256 的两个 30 位子授权（S-1-4-x-y）——大小写/别名拼经 canonical 化收敛同一 SID，重命名目录得新 SID（旧 ACE 成惰性残留，下次会话重传播一次自愈）；temp SID 加固定第三子授权 -1 域分隔防与工作区身份撞；
+path-boundary.ts[KS7T]: F:目录边界检查：temp 与工作区不相交 | R:- | A:index.ts/runner.ts | S:temp 父目录在工作区内即拒——其下创建的子目录会继承常驻工作区能力；实际 temp 与任一可写目录做双向包含检查（realpath native 后 relative 判定）——任一继承方向都合并两种能力。
+grant.ts[PS8S]: F:服务器侧写授权物化与生命周期 | R:code:packages/sandbox/sandbox-windows-acl/src/acl.ts | A:sandbox-local seam | S:工作区路径 standing（dispose 刻意跳过撤销——ACE 即跨会话复用缓存）；temp 路径 revocable（可继承 ACE 不得活得比其会话 temp 目录久）；add 失败抛出由调用者 dispose 实例、撤销迄今全部已授路径（fail-closed）；dispose 报告每个清理失败绝不静默；
+runner.ts[IS9M]: F:ACL 禁闭 runner：argv 包装执行 | R:- | A:sandbox-local 作为 wrap 前缀 spawn | S:argv 契约稳定（--workspace/--temp/--mode/--write-sid/--temp-write-sid 后 -- 接目标）；seam 传 SID 对时 runner 不授予不撤销且 SID 对路径校验；无 SID 时 workspace-write 自建随机 temp 子目录自派生 SID 退出后删；runner 重写自己环境 TMP/TEMP 且 lpEnvironment 传 NULL 让子继承——显式环境块经 koffi 触发 ERROR_INVALID_PARAMETER（实证）；所有失败打印 windows-acl-run 前缀并 exit 127 供 seam 匹配；子进程绝不被无限制 spawn。
+spawn.ts[PH6T]: F:受限令牌 spawn 适配器 | R:- | A:index.ts/runner.ts | S:inherit 模式恒裹 kill-on-close Job 使子随调用者死；pipe 模式返回调用者自有管道句柄；drainPipe 转发自共享 win32-process；控制 fd 7 可在 inherit 模式转发同一载荷描述符。
+acl-skill.ts[OE5T]: F:注册捆绑的 ACL 诊断技能 | R:- | A:skill 注册表 | S:包在 ASAR/SEA 内时外部 PowerShell 无法执行包内资源——provider 私有拷贝到临时目录（文件 0600 且 wx 独占创建）执行；处置移除 provider 与资源拷贝；
+ffi.ts[PH7M]: F:ACL/token Win32 绑定表与 koffi 封装 | R:- | A:包内所有原生调用 | S:LockFileEx 的 OVERLAPPED 必须传零化记录而非 NULL——koffi 3.1.1 收 NULL 会崩（实证）；isInvalidHandle 同时识别 null、0 与全 1 位哨兵；
+win32-abi.ts[FH6S]: F:ACL/token Win32 常量与布局尺寸 | R:- | A:ffi/acl/token | S:GRANT_MASK 刻意排除 WRITE_DAC 与 WRITE_OWNER——受限子进程否则可重写 DACL 或夺主逃逸 allowlist；
+
+===D:/chengzi-pro/dsh-official/packages/subprocess/subprocess/src/===
+index.ts[CW9S]: F:子进程缝：ctx.subprocess 契约 | R:code:packages/subprocess/subprocess-local/src/index.ts | A:bash/LSP/MCP/search 各消费方 | S:SENSITIVE_ENV_PATTERN（KEY|PASSWORD|SECRET|TOKEN 不区分大小写）加全部 DSH_* 剥离是子进程规范环境基底——显式 env 在洗涤后合并故刻意转发可存活；大小写不敏感匹配因 Windows 环境名不敏感（否则小写 dsh_ 残留读回如环境变量）；代理激活时补子 Node 识别代理的旗标并还原用户导出的代理名；相对路径含分隔符即拒——解析基底未定义 fail loud。
+types.ts[FW8M]: F:spawn 请求词汇：全显式无默认 | R:- | A:缝实现与消费者 | S:缝不应用任何默认——每处置/限制/目录显式（调用方配置决定，dsh-shell 的 request/spec 分离是模板）；collect 读偏移制非消费式——独立读者互不吞噬；
+control.ts[CW7T]: F:继承控制通道协议（fd 7） | R:- | A:launchers 与 Node 子进程 | S:SUBPROCESS_CONTROL_ENV 标记在子进程执行应用代码前消费并从 env 删除（不泄给孙子进程）；fd 7 是保留描述符；消息即便端点是继承的也视为不受信；标记缺失或非 pipe 值抛错而非降级。
+
+===D:/chengzi-pro/dsh-official/packages/subprocess/subprocess-local/src/===
+index.ts[PW9L]: F:本地子进程服务：平台托管范围选择 | R:code:packages/subprocess/subprocess-local/src/spawn.ts | A:ctx.subprocess 本地实现 | S:无配置——每处置来自 spec；POSIX 托管范围 TERM 先于 KILL，Windows 立即终止；dispose 等 MANAGED-RANGE 退出而非仅直命令——幸存后代不能活过 fiber；JS 可观察宿主 exit 走 prependListener 同步强停（exit 阶段不能 await 且单目标失败不阻断其余）；Linux 深探测正结果缓存；控制通道端点保活至 close 与进程寿命独立。
+spawn.ts[PW9L]: F:进程管道：stdio 处置/尾保留收集/范围信令 | R:code:packages/subprocess/subprocess-local/src/output.ts | A:index.ts 与平台 launch | S:POSIX 向分离进程组发信号（kill 负 pid）组亡回落直子；Windows taskkill /T /F 任何信号值都强制终止且结果故意不检查——树已亡（status 128）/退出竞速/缺 taskkill 二进制都如 ESRCH 容忍；睡眠 tick 保持 ref——awaited teardown 须保活事件循环否则父可退出却自称静默；Windows env 合并按大写键语义逐项替换（否则小写 dsh_ 残留）；killGroup 绝不抛——投递与进程退出竞速且可能跑在 timer 回调里。
+output.ts[PD8S]: F:有界输出尾与私有 spill 文件 | R:- | A:spawn 绑定与 win32 Job 路径 | S:默认 spill 目录是 mkdtempSync 的 0700 每进程目录（可预测世界可读路径会泄命令输出并招符号链接预创建）；目录每进程只建一次：外部清理器删空目录后下次 spill open 失败即降级内存尾（ENOENT 时日志点名临时清理是常见因）；
+managed-owner.ts[CW7T]: F:托管范围所有权最小接口 | R:- | A:平台 launch 实现 | S:signal 的 cancellationReason 只在 Windows 目标提交前使用；waitForExit 等「同一托管范围」空而非直命令——消费者 teardown 阶梯据此在每层持真实静默；
+control-spawn.ts[CW5T]: F:父侧控制管道提取与环境盖戳 | R:- | A:spawn/windows-job/linux-scope | S:DSH_SUBPROCESS_CONTROL 是保留名——调用者 env 里出现非 undefined 值直接抛错（防伪造控制标记）；fd 7 超出 Node 类型声明的 5 槽，从 stdio 元组按索引取；
+bin.ts[RV5T]: F:私有 runner 核心薄入口 | R:code:packages/subprocess/subprocess-local/src/spawn-runner.ts | A:打包 bootstrap | S:无有效 selection 时 exitCode 设 127；选择器由打包 bootstrap 预先移除后经参数/环境传入；失败经 reportSpawnRunnerFailure 走统一签名输出。
+linux-execve.ts[PH7T]: F:惰性 libc execve/fcntl 绑定 | R:- | A:spawn-runner Linux 引导 | S:execve 前对 0/1/2（及控制 fd 7）清 FD_CLOEXEC——否则继承的管道在 exec 后关闭、控制通道失效；错误码经 koffi.errno() 取而非 Node 全局；
+linux-scope.ts[PW8L]: F:Linux systemd scope 启动与托管 | R:- | A:index.ts Linux 路径 | S:scope 单元名含 pid 加随机 hex 防碰撞；systemctl 查询 5s 超时且 LC_ALL=C 使错误文本可匹配；MISSING_UNIT 正则识别 unit not found 类消息（容忍措辞变体）；启动请求经私有目录文件传递、bootstrap execve 后恢复目标态——环境全量在磁盘上故目录 0700 是边界；systemd 环境刻意清 SYSTEMD_LOG_TARGET 防噪声入查询输出。
+terminal.ts[PU8L]: F:node-pty 终端句柄实现 | R:code:packages/subprocess/subprocess-local/src/process-inspector.ts | A:PTY 消费者（bash 工具） | S:terminate 的承诺（结算后无写入/检查/信号在飞）仅因所有句柄调用同步完成——首个真异步步骤必须补远程 provider 所需的操作追踪；teardown 升级用 PID 加 start 身份围栏防 PID 重用后误杀；trackedDescendants 一旦根 pid 不再携带启动身份即停止收养；输出流在顶层进程退出后排空队列即结束。
+windows-inspector.ts[PW7M]: F:Windows Toolhelp32 进程表操作 | R:- | A:process-inspector 平台实现 | S:GetProcessTimes 创建时间作身份围栏 PID 重用；shell pid 充当伪进程组（Windows 无 POSIX 组）；koffi 惰性加载使非 Windows 进程永不触碰 Win32 库；
+windows-job.ts[PW8M]: F:Windows 父侧 Job runner 启动与所有权 | R:- | A:index.ts Windows 路径 | S:每 spawn 重查 runner 入口、绑定与当前 token Job 能力（可动态退化走回退路径）；终止经 runner.send 的 terminate IPC 消息而非 taskkill；启动取消有特定错误签名（name 为 Error 且 message 精确匹配且无 code/syscall/path）被识别为取消而非基础设施失败——分类决定错误面；cancellationReason 只记首个不覆盖。
+spawn-runner.ts[RV8L]: F:一次性 Linux exec 引导与 Windows Job 拥有 runner | R:- | A:bin.ts 入口 | S:Win32 spawn 错误码映射成 Node 语义（2/3/267 映射 ENOENT、5 映射 EPERM、193 映射 EFTYPE、740 映射 EACCES）使父侧错误与 Node spawn 可比；Linux 引导 execve 前仅保留 0/1/2/7 其余关闭；Windows 侧轮询 Job 空（isJobEmpty）与进程退出（pollProcessExit）双确认防幸存后代；目标启动被取消时发特定签名的 error 消息供父侧分类为取消。
+runner-launch.ts[PV7M]: F:私有 runner 调用解析与环境准备 | R:- | A:三平台 launch | S:三形态入口：pkg 单文件用 process.execPath、built 用 runner 出口、源码经 tsx 加 bin.ts（附 TSX_TSCONFIG_PATH 指向 monorepo 基座 tsconfig）；
+runner-protocol.ts[CW7M]: F:runner 私有传输：Linux 文件与 Windows 消息 | R:- | A:launch 双方 | S:Linux 启动请求写 0700 私有目录内 0600 完整文件（env 全量落盘——目录权限是机密边界）；启动错误发布在请求旁由父读取后一并清理；
+process-inspector.ts[KW7L]: F:平台进程表检查：就绪/信令/teardown | R:- | A:terminal.ts | S:快照表最多读一次（macOS ps fork、Linux /proc 走查、Windows Toolhelp32）——轮询成本与后代数无关，后续问题共享同一次读取；
+
+===D:/chengzi-pro/dsh-official/packages/mcp/mcp-client/src/===
+index.ts[IE8M]: F:MCP 客户端桥插件：服务器工具注册到 ctx.tools | R:code:packages/mcp/mcp-client/src/connection.ts | A:cordis.yml 多实例装配 | S:serverName 匹配 1-32 位字母数字下划线连字符且按 scope 唯一（agent-scoped 可跨 Agent 复用名，全局实例与同 Agent 内重复互斥，经 WeakMap 按注册 scope 记账）；工具调用默认 60s 超时；HMR 热替换用相同 serverName 重现相同公共名；failOnStartupError 决定初始连接/同步失败是否致命；属性化服务器指令上限默认 32768 字节。
+connection.ts[IR8L]: F:连接监督：代际管理与指数退避重连 | R:code:packages/mcp/mcp-client/src/tools.ts | A:mcp-client 插件 | S:一次断线共享一个尝试预算（连续失败计数，延迟翻倍至上限），稳定窗口后重置——崩溃循环服务器（哪怕短暂连上）也耗尽预算停止而非无限重启；耗尽后注销该服务器全部工具，唯有 disposal（含 HMR）能恢复；
+tools.ts[IE9L]: F:MCP 工具桥：公共名派生与两代同步 | R:code:packages/mcp/mcp-client/src/connection.ts | A:ToolRuntime | S:公共名 mcp__server__raw 是 (serverName,rawName) 的确定性纯函数；字符替换或截断到 DeepSeek 64 字符契约时追加 12 位 hex SHA-256 身份哈希防不同身份塌缩同名；raw 名只上 tools/call wire 永不从公共名反解；两阶段同步——fetch 阶段失败（网络或服务器列重复名）不动上一代，swap 阶段冲突意味着外来注册占据本服务器命名空间，回滚整代为零工具并记日志；初始严格模式可让冲突传播拒启动。
+transport.ts[IN7T]: F:传输工厂：stdio 子进程或 Streamable HTTP | R:- | A:connection 监督 | S:stdio 子进程 env 是 scrubbedParentEnv 加显式 env——MCP SDK 自己 spawn 故共享洗涤定义而非 spawn 路径；args 直传无 shell 插值；HTTP headers 原样附于请求；按 transport 判别式分派无默认分支。
+server-context.ts[IO6T]: F:服务器资源与指令的系统提示注入 | R:- | A:systemPrompt/mcpResources 消费方 | S:instructions() 返回最后一个成功连接代的字面文本，无活跃指令时空串；prompt 段 interpolate 为 false——服务器指令是字面量绝不参与插值（防指令注入提示模板语法）；
+
+===D:/chengzi-pro/dsh-official/packages/mcp/mcp-resources/src/===
+index.ts[AE8S]: F:作用域 MCP 资源运行时与共享工具 | R:code:packages/mcp/mcp-resources/src/tools.ts | A:mcp-client 注册、资源工具调用 | S:三个共享工具由 scope 内首个 provider 注册、层空时注销——独立于任何单服务器插件生命周期；request 先在调用方 scope 解析服务器——其他 agent 作用域的服务器不可见直接抛错；已配置服务器名单进 systemPrompt 的 MCP_SERVERS 段指引模型用三个工具名；同名重复注册在该 scope 报错。
+render.ts[MS7T]: F:资源结果投影：二进制不进模型历史 | R:- | A:资源工具渲染 | S:blob 字段被 JSON.stringify replacer 替换为 binary resource 描述（含 base64 字符数）——模型历史只见描述，原始 base64 只留给程序化调用方；输出带 MCP server 归属前缀。
+tools.ts[IE7T]: F:三个资源工具适配模型参数 | R:- | A:ToolRuntime | S:游标是服务器自有语义原样回传不解释；read_mcp_resource 的 uri 须来自 list 结果或展开的模板；三工具随注册 scope 效果注册、disposer 同步移除全部。
+
+===D:/chengzi-pro/dsh-official/packages/hooks/hook-protocol/src/===
+index.ts[CE8T]: F:钩子协议共享库总出口 | R:code:packages/hooks/hook-protocol/src/runner.ts | A:CC/Codex 两桥 | S:纯库非插件——各自桥拥有 payload、环境、matcher 模式与类型化扩展点映射；此文件只 re-export 不含逻辑。
+codec.ts[KM9S]: F:钩子进程输出解码：exit code+JSON+stderr | R:- | A:runHook、两桥 | S:exit 2 即阻塞且 stderr 为 reason；仅 exit 0 才尝试解析 stdout JSON，坏 JSON 保持纯文本可用；顶层 decision 只认 approve/block——顶层出现 deny/allow/ask 是非法值被忽略（它们只属 hookSpecificOutput.permissionDecision），防越权阻塞决策；expectedEventName 不匹配时仅丢弃事件域字段，顶层字段与声明的判别字段保留；本函数全总量：任何输入都不抛。
+matcher.ts[KB8T]: F:双方言 matcher：literal/regex 判别 | R:- | A:config 解析与运行时匹配 | S:Claude 模式纯字母数字下划线竖线视为 literal（竖线是精确交替分隔）否则 regex；Codex 恒为非锚定 regex；缺省/空/星号匹配全部；运行时对非法 regex 返回 false 不抛——配置解析期才用 matcherDiagnostic 拒绝并给稳定诊断。
+merge.ts[KB8T]: F:多钩子结果折叠为最严结果 | R:- | A:两桥映射到扩展点决策 | S:优先级 deny 大于 ask 大于 allow（block 归 deny、approve 归 allow）；reason 只汇合获胜 rank 的——低 rank 反对意见不上浮；第一个 continue 为 false 的 stop 粘滞并取其 stopReason；additionalContext 与 systemMessage 按钩子序累积不合并（合并方式归桥）；空列表产出中性结果（decision none 无 stop）调用方视为无钩子发言。
+runner.ts[IW9S]: F:经 ctx.shell 执行命令钩子并解码 | R:code:packages/hooks/hook-protocol/src/codec.ts | A:两桥 runPoint | S:默认超时 600s 常量住在协议层（两桥配置默认引用同一值防漂移）；per-hook timeoutSec 覆盖默认；bridge env 在 executor 洗涤后合并且可信；基础设施拒绝变成无 exit code 的 outcome——本函数绝不抛出不炸 turn；trailingNewline 因方言而异（CC 有 Codex 无）；expectedEventName 透传给 codec 做事件域字段守卫。
+events.ts[MO7S]: F:hook/invoked 与 hook/result 持久事件追加 | R:- | A:两桥 | S:DEFAULT_STDERR_SUMMARY_MAX_CHARS 为 500 且住在这里——两桥配置默认引用同一值防漂移；
+types.ts[FM7S]: F:方言中立钩子词汇与 log-only 事件 | R:- | A:两桥与 session 日志 | S:hook/invoked 与 hook/result 是 log-only（非 SurfaceEventType 无 surfaceOp）须 turn 包裹且 handlerId 配对；非 command 类型（prompt/agent/http）被桥解析即跳过不会到 runner；
+detached.ts[MW7T]: F:发射型钩子的分离运行追踪 | R:- | A:两桥的 SessionStart 等发射点 | S:track 必须传完整链（含 continuation/错误处理）——drain 等的是副作用（inject、warn）而非仅进程退出；
+
+===D:/chengzi-pro/dsh-official/packages/hooks/hooks-claude-code/src/===
+index.ts[IE9M]: F:Claude Code 命令钩子桥：七扩展点接入 | R:code:packages/hooks/hook-protocol/src/runner.ts | A:agent 拦截点 | S:configPath 进程级读一次（相对路径对启动 cwd），per-session 发现是 TODO；projectDir 未配置时每运行回退 agent 会话工作区——未修改钩子常引用 CLAUDE_PROJECT_DIR；updatedInput 只记警告不执行——定制行为应走原生插件；子代理 start 端保留 child 直至配对 end 端（stop 钩子需会话工作区仍在）；SessionStart 是发射型分离点走 detached 追踪；配置读取失败注册零钩子继续运行。
+config.ts[MC7S]: F:解析 Claude Code hooks 配置为共享组 | R:- | A:hooks-claude-code 桥 | S:CLAUDE_PLUGIN_ROOT 与 CLAUDE_PROJECT_DIR 占位在解析期替换（变量未设则留原样）；畸形条目忽略不炸启动；
+
+===D:/chengzi-pro/dsh-official/packages/hooks/hooks-codex/src/===
+config.ts[MC6T]: F:解析 Codex 五事件钩子子集 | R:- | A:hooks-codex 桥 | S:async 为 true 的命令被跳过（只跑同步）；timeout 与 timeoutSec 别名都接受；无命令替换；不支持事件与畸形条目忽略并记录 skipped 原因；matcher 非法 regex 同样抛 SyntaxError 整体拒绝。
+index.ts[IE8M]: F:Codex 命令钩子桥：五点接入 | R:code:packages/hooks/hook-protocol/src/runner.ts | A:agent 拦截点 | S:恒 regex matcher 无 literal 快路径；snake_case payload 且 stdin 无尾换行；无钩子环境变量、无命令替换、无预工具批准或重写路径——只执行阻塞决策；每个 payload 必带 model 字段；SessionStart 是唯一发射型分离点走 detached 追踪；钩子运行在 agent 会话工作区使相对路径指用户项目而非服务器启动目录。
+
+===D:/chengzi-pro/dsh-official/packages/jobs/jobs/src/===
+index.ts[CW9S]: F:后台作业缝：ctx.jobs 契约与环输出 | R:code:packages/jobs/jobs-local/src/index.ts | A:jobs-local 实现、tool-jobs | S:构造器检查 new.target——直接装载抽象缝包当场抛错而非远离误配置处失败；id 可预测（kind-N 序数）边界是 owner 授权而非保密；start 在无控制器服务 owner 时拒绝——生产者不能启动无人能收集或停止的作业；settlement 首次即赢：一终态记录、释放等待者、一轮包含式事件——settled 事件报告 awaited 让完成报告者跳过等待者已收的结算；
+types.ts[FW8M]: F:作业生产者/注册表/消费者共享词汇 | R:- | A:两包与消费者 | S:JobHandle.append 在结算后静默丢弃并记日志——生产者尾随 flush 不得炸自身 teardown 路径；offset 按 UTF-8 字节推进、空块丢弃不唤醒观察者；done 在生产者释放资源后才 resolve 且不得 reject（reject 被运行时转为 failed）；
+brand.ts[FW5T]: F:JobId 品牌叶：浏览器安全 | R:- | A:包根与 types（Host 依赖隔离） | S:独立叶存在是因为包根与 types 经 owner/listener 签名触达 dsh-agent——浏览器程序作为类型也无法解析；JobId 本体来自零依赖 dsh-brand。
+archive-admission.ts[MW7T]: F:Workspace 归档准入的 job 家族 | R:code:packages/workspace/workspace/src/index.ts | A:workspace 注册表归档流程 | S:在缝构造器安装故对所有实现成立（仅靠抽象 list/kill 回答）；kill 单个失败仅警告不阻断该 Session 其他作业的终止；
+view.ts[FW7S]: F:客户端安全作业投影与 chunk 词汇 | R:- | A:模型工具/浏览器名册/观察流 | S:JobView 是每次新对象绝非活注册表状态；log 通道是生产者叙述仅观察者可见，模型读取永不送达；消费方对未识别 channel 按缺席处理；
+
+===D:/chengzi-pro/dsh-official/packages/jobs/jobs-local/src/===
+index.ts[PW9L]: F:进程内作业注册表实现 | R:code:packages/jobs/jobs-local/src/ring.ts | A:ctx.jobs 本地实现 | S:默认每 owner 10 并发作业、活环 256KB、结算后保留 16KB（首读结算结果时才裁到）、泵询 150ms；scoped layers 使控制器与 scope 订阅按 owner 相对——扁平表会让一个 preset 的控制器为未装载它的 agent 打开 start、一次结算打到每个 preset 的监听器；teardown cancel 抛错只强失败记录并报可能孤儿（不声称工作已停）；modelCursor 只被 read 移动而 readAt 绝不动它；start 后同步返回注册 id——starter 内抛错则什么都没注册且跳过序数。
+pump.ts[MW7S]: F:注册表拉泵：源到环的有界拷贝 | R:- | A:jobs-local start | S:结算后最终再 drain 一次保证环含全字节后才裁剪关闭；lossy 读落 gapBefore 块使不连续对观察者可见；
+ring.ts[KD8S]: F:有界输出环：绝对偏移与头淘汰 | R:- | A:jobs-local 记录 | S:淘汰永不移动已分配偏移——earliest 只前进；单超限块只留 UTF-8 安全尾（推进过 continuation 字节不劈码点）并打 gapBefore 标记；readFrom 落后保留窗返回 lossy 标记而非错误；返回块是新鲜 wire 对象非活状态；earliest 等于 total 表示无保留。
+events.ts[MM7S]: F:作业事件路由：filter 与 scope 层 | R:- | A:jobs-local hub | S:owners 为 scope 的订阅按注册上下文的 scope 层归档，投递时并全局层加 owner 作用域链——全局层（未 scope 上下文注册）收所有 owner；
+
+===D:/chengzi-pro/dsh-official/packages/jobs/tool-jobs/src/===
+index.ts[IU8L]: F:job_output/job_list/job_kill 工具与完成注入 | R:code:packages/jobs/jobs-local/src/index.ts | A:模型工具调用 | S:装载即附上生产者所需的控制器——无此插件的组合里 start 被缝拒绝；完成通知对忙碌 owner 注入、空闲 owner 默认 wakeup 开 turn——maxConsecutiveWakes 可封顶自激励链（唤醒的 turn 又启动完成的作业）但超限通知静默等用户输入；
+render.ts[MU6S]: F:模型面向渲染：增量与状态行 | R:- | A:tool-jobs 工具 | S:log 块永不达模型（观察者专属）；stderr 聚合为单个标记段落排在 stdout 之后——与 shell 工具前台结果同构；
+
+===D:/chengzi-pro/dsh-official/packages/guard/repeat-tool-reminder/src/===
+index.ts[MQ7M]: F:重复调用提醒：咨询性丰富不否决 | R:- | A:agent post-execute 决策链 | S:检测链键比较全量 canonical 参数（深度键排序 JSON）而详细提醒仅引 500 字符——上限界提醒不界检测；
+
+===D:/chengzi-pro/dsh-official/packages/telemetry/otel/src/===
+index.ts[CO6T]: F:OTLP 双通道入口：事件与会话日志 | R:- | A:遥测消费插件 | S:挂载本身不建队列/身份/网络连接——每通道由 createEventReporter 或 createSessionLogReporter 独立创建且状态零共享；
+transport.ts[IN6T]: F:显式 OTLP JSON 传输（会话日志） | R:- | A:session-log 管道 | S:刻意不继承其他 collector 的 headers 或 TLS 身份——只取显式 endpoint/headers/agent；headers 是 async 函数按请求解析且恒设 application/json；
+session-log.ts[MO7M]: F:会话日志字节有界队列 | R:- | A:反馈授权的会话导出 | S:SESSION_LOG_MAX_REQUEST_BYTES 为 4MB 是含 OTLP 信封的未压缩上限——maxRequestBytes 只能降不能超且构造期校验；
+event-transport.ts[IN6S]: F:可取消事件 HTTP 导出（重试与读限） | R:- | A:event-log 通道 | S:通道取消释放进行中请求与重试计时器（AbortSignal.any 注入 got）；retry 只对 POST 方法的 429/502/503/504 上限 5 次 backoff 上限 5s；
+event-log.ts[MO6T]: F:普通事件 SDK 计数批处理 | R:- | A:产品遥测 | S:body 语义承诺绝不提示词/响应/凭据/文件内容；attributes 只收标量或标量对象且无自动设备或账户身份——字段由调用方显式选择；
+
+===D:/chengzi-pro/dsh-official/packages/webhook/webhook/src/===
+index.ts[AE8S]: F:fire-and-forget webhook 规则运行时 | R:code:packages/webhook/webhook/src/session.ts | A:webhook-github 适配器 | S:dispatch 在分发前快照并深冻结 delivery——同一 delivery 共享给任意匹配规则不可变；响应在内存分发后立即返回绝不等待规则结算；runtime closing 后 register 与 dispatch 抛错；规则注销 abort 该规则控制器并排空活跃回调；重复注册同 id 抛错；快照要求 delivery 是无损 JSON 否则 TypeError。
+session.ts[AB8S]: F:Workspace 支撑的会话创建事务 | R:- | A:规则 run 返回值处理 | S:规则结果在跨 await 前快照校验（同进程也防变异）——workspacePath 须绝对、五个字符串字段非空；成功 prompt 准入即结束 webhook 所有权（Agent 归普通生命周期）；installInitialModelSelection 只在首个持久请求头存在前应用创建时选择且剥离继承 reasoningEffort；
+brand.ts[FB4T]: F:webhook 三个品牌身份 | R:- | A:适配器/规则/消息源 | S:WebhookDeliveryId 无内建去重语义——runtime 不按它去重，是否重复投
+types.ts[FE6S]: F:provider 中立投递/规则/请求词汇 | R:- | A:适配器实现 | S:WebhookEventMap 经声明合并扩展——出树 kind 落 JsonValue；Session 请求的 agentPreset 与 permissionPreset 在发布前挂载；
+
+===D:/chengzi-pro/dsh-official/packages/webhook/webhook-github/src/===
+index.ts[IN7T]: F:签名 GitHub HTTP 适配器注册 | R:code:packages/webhook/webhook-github/src/handler.ts | A:webServer 路由表 | S:secretEnv 是 role('credential-ref')——经 credentials 缝解析绝不落字面量；path 须绝对非根无尾斜杠无 query 无 fragment；source 须 trim 稳定非空；路由是 exact 匹配经 effect 注册。
+handler.ts[IN8S]: F:GitHub 鉴权/解析/分发处理 | R:- | A:exact 路由 | S:HMAC 验签失败 401——octokit 验证异常被吞（不带任何响应细节给发送方）；secret 不可用是 503 与验签失败区分；headersDistinct 要求恰一个值——多值或空白头按缺失拒绝防歧义头绕过；Content-Type 只收 application/json 加至多一个 utf-8 charset 参数；
+body.ts[MN7T]: F:有界原始 body 读取 | R:- | A:handler.ts | S:Content-Length 非纯十进制拒绝、超上限即 413 且 resume 释放连接；流式累计超限同样 413；EOF 后校验 request.complete 防中止流被当完整；
+types.ts[FN5T]: F:GitHub 事件类型投影 | R:- | A:WebhookRule 的 github 作者 | S:事件特定字段验证归各规则——适配器只保证签名后的 JSON 对象；name 是原始 X-GitHub-Event 头值不做归一。
+
+===D:/chengzi-pro/dsh-official/packages/schedule/schedule/src/===
+index.ts[AW9L]: F:Host 级持久提醒服务 | R:code:packages/schedule/schedule/src/runtime.ts | A:tool-schedule 与远程管理 | S:sessionPersistence 是装填顺序要求而非直调服务——交付只在 ctx.sessions.flush() 报告有 session/flush 监听器参与时提交，持久化后端正是注册该监听器的插件；启动校验每 task 键等于 record.id 否则拒开域（先尝试关域且关域失败不掩盖原错误）；会话重建不重放历史 Schedule 事件（session/created 时丢弃）；交付历史取 days 与 records 两约束较旧者，确认追加时才剪枝且 lastDelivery 恒保留；所有变更经单链序列化防与交付交错。
+domain.ts[DW9L]: F:严格 Schedule 解码/重放/时间验证 | R:- | A:storage schema 与服务 | S:CRON_SEARCH_HORIZON_YEARS 为 400——格里高利 400 年周期使可匹配规则必有解，超界只会枚举永不符合的规则（创建与决策成本有界）；every 最小间隔 60s；title 必须显式提供（绝不从指令派生名）trim 后非空且最长 120 字符；recurring 决策只推导最新到期不枚举积压；daily 墙钟缺口跳日重叠取较早瞬时；ScheduleInputError（模型输入，封闭九码）与 ScheduleLogError（耐久数据损坏）是两套错误体系；四位年 UTC 瞬时是存储格式，0000 年被排除。
+runtime.ts[MW8S]: F:Host 定时器驱动交付 | R:- | A:index.ts 持有 | S:至多一个定时器跨重算——requestDrive 幂等合并请求且 running 期间只置标志；drive 与管理写共享 transact 序列化防交错；派发失败记日志、被拒准入不自动重试；MAX_TIMER_DELAY_MS 为 2^31-1 即 Node 定时器钳制上界；dispose 只等静默（吞执行失败——失败已由 requestDrive 报告）；
+storage.ts[FD8T]: F:持久任务域 schema | R:code:packages/storage/storage-domain/src/spec.ts | A:storageDomain.open 的 schedule 域 | S:record 用 z.unknown 加 transform 包装 decodeScheduleRecord——耐久边界跑包自有严格解码，zod 只是载体；lastDelivery 必须与 history 最新收据一致（refine 校验 messageId/scheduledAt/deliveredAt 三元组）；畸形任务拒开整个域；status 缺省解码为 active（缺 status 即活跃）；交付 history 的 messageId 集合须唯一。
+update.ts[DW6S]: F:乐观的名字/指令/时序更新 | R:- | A:远程管理 RPC | S:时序变更须恰含 kind 加对应 selector 两键——数组/null/未知判别/多余键都拒（RPC 线上不可信）；
+types.ts[FW8L]: F:Schedule 值类型：六种规则判别 | R:- | A:wire 与工具 | S:六种 kind（after/at/every/daily/weekly/cron）各有固定存储字段集；weekly/daily 存显式 IANA 时区——等价时序编辑保留存储拼写；scheduledAt 恒为四位年 RFC3339 UTC 瞬时字符串；跨包声明合并 schedule 活动家族进 workspace 的 SessionActivityKindMap。
+client.ts[FV4T]: F:浏览器安全 Schedule 词汇再导出 | R:- | A:Remote 客户端 | S:纯 type 再导出叶——避免浏览器包拉入 Host 运行时依赖。
+delivery-history.ts[DD7T]: F:交付历史追加与身份分页 | R:- | A:runtime 确认路径 | S:剪枝只在唯一写路径 appendDelivery 发生——域每写发布整单元文档，无界数组会无限增长文档；读路径不设自身界限（超 schema 限的整单元文档拒绝打开）；
+
+===D:/chengzi-pro/dsh-official/packages/schedule/tool-schedule/src/===
+index.ts[IU8M]: F:schedule_create/list/update/delete 模型工具 | R:code:packages/schedule/schedule/src/index.ts | A:模型工具调用 | S:每调用作用于调用 Agent 的 Session——子代理经 delegationDepthOf 拒绝（subagent_session 稳定错误码）；preset 声明装载故服务未装的组合保持惰性（schedule 服务按 scope 解析）；错误码封闭九种逐个 schema 化含 internal_error；视图输出按六种 kind oneOf 判别。
+
+===D:/chengzi-pro/dsh-official/packages/subprocess/win32-process/src/===
+index.ts[CH6T]: F:Win32 进程/stdio/Job 原语总出口 | R:code:packages/subprocess/win32-process/src/process.ts | A:subprocess-local 与 sandbox-windows-acl | S:共享低层原语的家——两个 Windows 消费方都经此表组合绑定而非各自绑定 Win32；导出面是封闭集合（绑定表扩展经 extendWin32ProcessBindings）。
+koffi.ts[LH4T]: F:进程域惰性 Koffi 访问 | R:- | A:ffi.ts | S:koffi 在首个 Win32 原生操作才加载——非 Windows 进程与未触发原生路径永不触碰原生库
+errors.ts[FR4T]: F:Win32Error：API 名加确切错误码 | R:- | A:全部原生调用方 | S:携带 api 名与 win32Code 两个机器可读字段——调用方分类依赖 win32Code 而非解析
+abi.ts[FH6S]: F:通用 Win32 常量（x64 验证） | R:- | A:ffi.ts/process.ts/control-stdio.ts | S:全部布局尺寸与偏移（JOBOBJECT 各结构、STARTUPINFOW 旗标）在 x64 上验证；KILL_ON_JOB_CLOSE 是 Job 生命周期的锚——最后句柄关闭即终止全体成员；
+control-stdio.ts[CN6T]: F:Windows CRT 启动描述符表编码 | R:- | A:process.ts 的继承控制管道 spawn | S:在子运行时分配描述符前编码 CRT 的 lpReserved2 描述符表——fd 7 的控制管道由此在 CreateProcess 时就位；空槽必须显式写 INVALID_HANDLE（全 1 位）；
+ffi.ts[LH7M]: F:惰性 Koffi 绑定：进程/stdio/Job 调用表 | R:- | A:process.ts 与两个消费包的扩展 | S:NativePtr 是品牌化 bigint 防误当数字用；kernel32 与 advapi32 各加载一次、共享 stdcall binder；绑定表可经 extendWin32ProcessBindings 组合扩展（ACL 包即此用法）；
+process.ts[PH8L]: F:类型化 Win32 进程操作：spawn/Job/管道 | R:- | A:subprocess-local 的 windows-job 与 ACL 沙箱 spawn | S:quoteArg 按 CommandLineToArgvW 规则逐字符转义（反斜杠仅在引号前翻倍）；环境块编码前按大写键排序——CreateProcess 的 UTF-16 环境要求排序去重；受限令牌路径 lpEnvironment 刻意传 NULL（经 koffi 传显式块触发 ERROR_INVALID_PARAMETER，已实证）——沙箱须先改自己环境再 spawn；
+
+===D:/chengzi-pro/dsh-official/packages/compaction/command-compact/src/===
+index.ts[EU6S]: F:/compact 人工压缩命令（无参数，错误码转人类文案） | R:code:packages/compaction/compaction/src/index.ts | A:人类可读名：命令注册表用户 | S:effect 先 yield drain 再 register——复合 teardown 是 LIFO，保证已开始的 handler promise 先 quiesce 且无新调用进入；active 集合 retire 分支两路都不 rethrow，防镜像 promise 变 unhandled rejection；
+
+===D:/chengzi-pro/dsh-official/packages/web/web-search-deepseek/src/===
+types.ts[FN7T]: F:DeepSeek Messages 私有线格式类型 | R:code:packages/web/web-search-deepseek/src/provider.ts | A:provider 映射层 | S:web_search_result 项通常无内联 snippet——摘录在独立 text 块的 citations[] 里按 url 关联，两块必须 join；错误 envelope 字段尽力而为（error 可为字符串或对象）。
+index.ts[EN6S]: F:注册 DeepSeek 搜索 provider（凭证与端点解析） | R:code:packages/web/web-search-deepseek/src/provider.ts | A:宿主插件装载 | S:辅助搜索端点独立于会话适配器的 DEEPSEEK_BASE_URL，环境覆盖变量是 DEEPSEEK_SEARCH_BASE_URL；仅当 session.requestContext().provider 为 deepseek-account 时才尝试账户 token；
+
+===D:/chengzi-pro/dsh-official/packages/shell/pwsh-local/src/===
+resolve.ts[DG8T]: F:pwsh 可执行文件解析（依赖-free 纯函数） | R:code:packages/shell/pwsh-local/src/index.ts | A:PwshLocalExecutor 与覆盖率门探针 | S:刻意保持无依赖以便 vitest.config.ts 覆盖率探针与被测代码共享同一解析定义——探针解析不一致会错误豁免实际在跑的文件；Windows 顺序为 PowerShell7 安装目录→PATH 各项（去除 setx 式引号）→最后回落 Windows PowerShell 5.1；候选存在性用 lstat 而非 stat：Store 应用执行别名是 reparse 点，stat 会因目标 ACL 报 EACCES 漏判。
+index.ts[DR7L]: F:本地 PowerShell 执行器（bash-local 的刻意镜像） | R:code:packages/shell/bash-local/src/index.ts | A:tool-pwsh 与 pwsh-sandbox | S:命令作为单个 argv 元素传 -Command，无中间 shell 因此无引号转义层；
+
+===D:/chengzi-pro/dsh-official/packages/host/frontend-static/src/===
+index.ts[ES7S]: F:SPA dist 静态服务占 webserver fallback 席位 | R:code:packages/host/webserver/src/index.ts | A:Web 部署组合 | S:distIndex 应由组合方以 !!js 表达式提供（workspace 知识），不许部署硬编码；
+
+===D:/chengzi-pro/dsh-official/packages/host/directory-picker-browse/src/===
+index.ts[DR6M]: F:browse 后端：流式单层目录列举与子目录创建 | R:code:packages/host/directory-picker/src/index.ts | A:directoryPicker 缝消费者 | S:opendir 流式读入 maxEntries+1 有界窗口，内存 O(keep)，+1 槽证明截断；窗口淘汰后坏 symlink 不回填（保持 truncated 诚实）；
+
+===D:/chengzi-pro/dsh-official/packages/shell/shell-env/src/===
+index.ts[CS6S]: F:ctx.shellEnv 托管 DSH_* 环境注册表 | R:code:packages/shell/shell/src/types.ts | A:tool-bash/tool-pwsh | S:每次模型 shell 调用重建命名空间：executor 先丢环境 DSH_* 再注入 collect 快照；
+
+===D:/chengzi-pro/dsh-official/packages/shell/tool-bash-persistent/src/===
+index.ts[EB6L]: F:持久 bash 工具：PTY 会话+nonce 标记捕获输出 | R:code:packages/shell/tool-bash-persistent/src/index.ts | A:模型 tool 调用 | S:每 owner 一个 PTY 会话且按 owner 串行化（WeakMap 队列）；命令用随机 UUID 标记包裹在单物理行（多行会触发 PS2 提示泄漏）；
+
+===D:/chengzi-pro/dsh-official/packages/fs/tool-str-replace-editor/src/===
+index.ts[IU7L]: F:str_replace_editor 兼容工具：view/create/编辑 | R:code:packages/fs/fs/src/index.ts | A:习惯 Claude 风格编辑器的模型 | S:只收绝对路径——相对路径报错并提示应加斜杠前缀；view 目录最多 2 层且过滤隐藏文件/node_modules/__pycache__；
+
+===D:/chengzi-pro/dsh-official/packages/guard/timeout-policy/src/===
+index.ts[MW7T]: F:协作式工具超时强制器 | R:- | A:tools/execute 包装 | S:TOOL_TIMEOUT 同时是内部 deadline 分类码与结构化 error code——用 timeoutOf 对本插件 signal 的作用域判定，防嵌套外层 deadline（另一 wrapper
+
+===D:/chengzi-pro/dsh-official/packages/llm/llm/src/===
+index.ts[IN9L]: F:LLM 服务：适配器注册表、llm/stream 瀑布与调用预解析 | R:code:packages/llm/llm/src/types.ts | A:dsh-agent-loop、各 provider 适配器、llm-retry | S:loop 构建的请求经 markAgentLoopRequest 打标且深冻结（监听器改动即 throw），手建请求不带标记；registerAdapter 全有或全无，replace 空数组合法但初始注册空路由非法，dispose 后 replace 抛 REGISTRATION_DISPOSED；llm/adapters-updated 监听器逐个隔离失败不否决注册。
+types.ts[CN9L]: F:LLM 契约：StreamChunk 流协议、GenerateOptions、模型发现与用量类型 | R:code:packages/llm/llm/src/index.ts | A:全部适配器与请求装配方 | S:StreamChunk 契约要求 usage 先于 finish 且其后无 chunk；tool arguments 保持原始 JSON 字符串；适配器 throw 会被 LlmRuntime 归一化为 error 或 aborted 的终止 finish；ReplayEnvelope.blocks 数与发射块数不符时整包丢弃；purpose 仅辅助模型调用设置。
+message.ts[CB9M]: F:五角色消息值类型、不可变构造器与 source/form 语义词汇 | R:code:packages/llm/llm/src/content.ts | A:session、agent-loop、全部消息生产者 | S:ContextForm 是语义词汇——颜色、图标、排序等视觉决策禁止进入该联合；boundContextSummary 把 notice 摘要截到 120 字符；createMessage 族生成 randomUUID 并深冻结；kind 与 form 两轴独立（谁生产 vs 是什么东西）。
+content.ts[KB7L]: F:内容块助手：图片与文件投影为文本、image offload 预算 | R:code:packages/llm/llm/src/types.ts | A:LlmRuntime 路由投影、文本模型适配器 | S:projectImagesForTextModel 仅在超预算时把图片块替换为占位文本；
+assistant-stream.ts[KD8L]: F:模型流的无损紧凑记录（delta 打包）与记录级读取器 | R:code:packages/llm/llm/src/assembler.ts | A:assistant/attempt 持久化、session-query、遥测 | S:仅 text、reasoning、tool-call 三种 delta 被打包成 run 记录，其余 chunk 类型永远是裸 chunk；时间戳必须安全整数否则 TypeError；记录级读取器信任静态类型不校验，expandAssistantStream 才是持久边界的唯一校验路径。
+assembler.ts[KB9M]: F:增量 chunk 到消息的装配器，agent loop 唯一规范装配算法 | R:code:packages/llm/llm/src/assistant-stream.ts | A:dsh-agent-loop | S:block-end 权威关闭并冻结 partial，其后同 index 的迟到 delta 被静默忽略，防畸形流撑爆内存；重复 block-end 首个生效；tool-call 缺 id 时合成 call-<index>；未知块类型在 assemble 时抛错。
+error.ts[CR9S]: F:HarnessError 基类与上下文溢出、配额的 provider 措辞分类器 | R:code:packages/llm/llm/src/index.ts | A:全部包错误分类、重试判定 | S:isContextWindowExceededError 靠英文正则匹配 provider 措辞，换供应商措辞可能漏判；EMPTY_RESPONSE 视为可安全重试，INVALID_CREDENTIAL 刻意不进默认重试集（改值才有用）；errorChain 仅用于诊断渲染，禁止解析其结果——路由必须走 code。
+adapter-failure.ts[IR7S]: F:把适配器抛出的任意值归一化为可序列化 LlmFailure | R:code:packages/llm/llm/src/error.ts | A:LlmRuntime 终止 finish chunk | S:只读 own 数据属性描述符，绝不触发 SDK 可能抛错的 getter；carried failure 仅在 code 与自身 code 属性一致时才被信任——跨包拷贝丢类身份后防止错配；
+api-key.ts[CS7T]: F:API key 形态判定：trim 后按 HTTP header 可承载字符校验 | R:code:packages/llm/llm/src/index.ts | A:各 provider 适配器凭据检查 | S:合法集为可打印 ASCII（不含空格），刻意排除 Latin-1——宁可本地明确拒绝也不给模糊 401；trim 是静默的因为 padded key 只有唯一读法；
+attribution.ts[IN6T]: F:构造每个 provider 请求的 User-Agent 归属头 | R:code:packages/llm/llm/src/index.ts | A:全部 LLM 适配器 | S:版本经 createRequire 读包自身 manifest 防手抄漂移，相对路径同时适配 src 与打包后 lib；省略 identity 参数回退默认值，归属无法被完全抑制；禁止放 per-user 或 per-request 数据。
+brand.ts[CG8T]: F:dsh-llm 品牌 id：MessageId、ToolCallId、ProviderRequestId 等 | R:code:packages/llm/llm/src/types.ts | A:消息、会话、工具全链 | S:构造器无校验——ToolCallId 由 provider 签发，仅 mock 与 assembler 回退才合成；品牌原语住在 dsh-brand，本包只是命名出口，跨边界 id 的命名惯例以此对齐。
+call-config.ts[CC8T]: F:会话调用配置类型、字段级相等与 loop 请求进程内标记 | R:code:packages/core/session/src/request-header.ts | A:agent-loop header 折叠、llm 瀑布 | S:AGENT_LOOP_REQUESTS 是 WeakSet 按对象同一性判定，结构化克隆后失效；stop 数组逐元素比较；配置字段与 GenerateOptions 一一对应，loop 从日志 header 重建请求而不接受每调用漂移。
+retry-policy.ts[IR8S]: F:provider 路由重试策略的校验、默认化与冻结解析 | R:code:packages/llm/llm-retry/src/index.ts | A:provider 适配器注册、llm-retry 执行 | S:默认 maxRetries=5、initial 500ms、max 10s、jitter 0.1，默认重试码含 EMPTY_RESPONSE、RATE_LIMIT、SERVER、TIMEOUT、TRANSPORT；retryableCodes 拒空拒重；always 模式仍拒绝未知键以拦截分层配置残留；所有上限受 MAX_TIMER_DELAY_MS 约束。
+
+===D:/chengzi-pro/dsh-official/packages/llm/llm-retry/src/===
+index.ts[AR9M]: F:agent/request-error 恢复点上的 provider 路由重试执行器 | R:code:packages/llm/llm/src/retry-policy.ts | A:dsh-agent-loop 请求恢复 | S:先 append llm/retry 再 await 可取消延迟，唤醒后 append llm/retry-started 才返回 retry；providerRetryAfterMs 超 maxDelayMs 时 normal 模式转交下游、always 模式改本地退避；指数封顶 2 的 1024 次方；dispose 时 abort 生命周期、拦截陈旧回调并 drain 活跃等待。
+types.ts[FM7T]: F:声明 llm/retry 与 llm/retry-started 会话事件载荷 | R:code:packages/llm/llm-retry/src/index.ts | A:session-projection 的 llmRetry 单元、session-query | S:两事件均非 surface 不入模型历史；retryId 在同一条重试链内复用（首个重试铸造）；normal 载荷含 maxRetries 而 always 载荷不含。
+brand.ts[CG4T]: F:RetryId 品牌类型与无校验构造器 | R:code:packages/llm/llm-retry/src/types.ts | A:llm-retry 执行器与投影状态 | S:品牌不校验值；同一重试链复用同一 RetryId，投影状态键为 provider 加 policyK
+
+===D:/chengzi-pro/dsh-official/packages/session/session-persistence/src/===
+index.ts[PD9M]: F:持久化服务定义：create/open/stat/list 与全局 flush 语义 | R:code:packages/session/session-persistence/src/handle.ts | A:agent 生命周期写入器、message-feedback、session-query | S:append 尽力而为，flush 才是崩溃持久承诺；torn 物理尾绝不返回读者且由写路径先截断；create 后本进程立即可见，其他进程要等物化——从未物化即崩溃的会话等于不存在；OwnershipLostError 已声明但现有 in-process 后端从不抛出。
+storage-contract.ts[PD9S]: F:后端共享校验：版本门、fail-closed 词汇、批物化与连续性 | R:code:packages/session/session-persistence/src/errors.ts | A:全部持久化后端实现 | S:validateStoredEvents 拒绝未知事件类型除非 ignorable:true，并单独拦截 request/header 的退役 reason fallback——它是藏在已知类型下的唯一退役形状；materialize 系列单次遍历完成校验加快照，防 accessor 双读出不同值；版本拒绝文案按新于或旧于当前版本区分方向。
+handle.ts[PD8S]: F:SessionHandle 契约：单属主读写通道与 append、flush、close 语义 | R:code:packages/session/session-persistence/src/index.ts | A:持久化后端与会话生命周期 | S:write 句柄能读到自己成功的 append；同一句柄重复读绝不回退到更旧状态；close 幂等、不可取消且自身会 drain 持久化——并发 close 视为已 flush；closed 后一切操作抛 SessionHandleClosedError；append 首事件 seq 必须等于存储 next-seq。
+revision.ts[CD5T]: F:SessionPersistenceRevision 品牌 opaque 修订令牌 | R:code:packages/session/session-persistence/src/index.ts | A:session-projection-cache 等派生读模型缓存 | S:仅同一 service 实例、同一 session id 内可比；相等可当未变，不相等零承诺；写属主变更不影响 revision；它不参与 open、read 或 resume。
+errors.ts[CR7S]: F:持久化稳定错误族与方向性格式拒绝文案 | R:code:packages/session/session-persistence/src/storage-contract.ts | A:后端与加载方 | S:FormatUnsupported 与 Corruption 语义分界——前者日志完好只是本构建读不了；
+
+===D:/chengzi-pro/dsh-official/packages/session/session-projection/src/===
+index.ts[DD9L]: F:sessionProjections 注册表：驱动纯折叠单元、水位缓存与检查点 | R:code:packages/session/session-projection/src/types.ts | A:llm-retry、subagent、permission-presets、projection-cache | S:apply 必须同步、state 必须纯 JSON（持久缓存前置）；不感兴趣的事件必须返回同一 state 引用否则全链传播；view 比较保留最近两个原始结果按 Object.is 判变，对象视图不复用引用会造成空转发布；同 key 不同 stateVersion 的注册直接抛错；日志截断到水位以下时快照端点拒绝。
+types.ts[CG6T]: F:投影两张 merge-extensible 类型表的纯类型出口 | R:code:packages/session/session-projection/src/index.ts | A:域插件 declare-merge、client 聚合 | S:从包根或本出口 re-export 保持符号同一性，两处 merge 落到同一张表；host-only 键只进 StateMap 不进客户端可见 Map；值必须是 wire-JSON 整值。
+
+===D:/chengzi-pro/dsh-official/packages/session-query/session-query/src/===
+index.ts[AB9L]: F:SessionQueryEngine：精确读、过滤、trace 具体化与搜索抽象门面 | R:code:packages/session-query/session-query/src/types.ts | A:session-reference、subagent、tool-session-query、UI | S:精确读、过滤与 trace 是后端无关具体行为，searchSessions 与 searchEvents 留给后端实现；配置构造期校验非法即抛；live-preferred 解析——同 id 存活会话优先，与持久副本 header 冲突抛 SOURCE_CONFLICT。
+types.ts[CD8S]: F:查询公共记录：会话、表面、日志快照与搜索及 trace 载荷 | R:code:packages/session-query/session-query/src/index.ts | A:后端实现与消费 UI | S:SessionEventSurface 三态——shadowed 指被 compaction 替换但仍留在原始日志的事件；SessionLogSnapshot.events 已做内存 interrupted 回合平衡与 replay 校验；capturedThroughSeq 对空日志为 null。
+config.ts[CC7T]: F:查询配置常量与 17 个稳定错误码分类 | R:code:packages/session-query/session-query/src/index.ts | A:引擎构造与后端实现 | S:默认 readWindowMax=50、持久读并发 4、prepared 缓存 5；SessionQueryError 以 declare 收窄 code 但运行时不拦错值，码表是稳定机读契约不可擅改。
+cursor.ts[CD4T]: F:SessionSearchCursor 品牌 opaque 分页令牌 | R:code:packages/session-query/session-query/src/config.ts | A:searchEvents 分页调用方 | S:cursor 对消费者完全 opaque，禁止解析或自制；
+sources.ts[CD6T]: F:逻辑会话源的 header 兼容断言 | R:code:packages/session-query/session-query/src/corpus.ts | A:corpus 解析与 observation | S:逐字段比较 id、createdAt、cwd、parentSession、isSeeded、delegationDepth（缺省按 0），任一冲突抛 SOURCE_CONFLICT——防 live 与持久副本静默错配。
+cold-read.ts[PD8T]: F:一次性冷读存储日志并在内存补 interrupted closers | R:code:packages/core/session/src/repair.ts | A:corpus 与 observation 的持久分支 | S:只开 read 句柄读完即关；closers 仅在内存追加绝不写回存储；读失败时吞掉 close 的次生错误保留原始原因；返回 eventState 供 Session.fromRestore 免复制采纳。
+corpus.ts[AD8M]: F:live-preferred 语料解析：存活优先、持久回退、并发批量投影 | R:code:packages/session-query/session-query/src/cold-read.ts | A:SessionQueryEngine | S:sessionPersistence 为可选依赖经独立 fiber 注入，服务替换或卸载时自动解绑且只清自己的绑定；LogicalSessionSource 的 events 仅在同步投影调用内有效，保留输出必须克隆；持久读并发受配置上限约束。
+documents.ts[KB7T]: F:事件记录与语义搜索文档构建含表面三态分类 | R:code:packages/session-query/session-query/src/extraction.ts | A:搜索后端索引器 | S:表面分类走 foldSurface 加当前消息投影，失败统一映射为 INVALID_SURFACE；抽取文本为空的结构性事件不生成文档，结构性事件只进 records 不进索引。
+extraction.ts[KB7T]: F:首方事件语义文本抽取 | R:code:packages/session-query/session-query/src/documents.ts | A:搜索文档构建 | S:reasoning 块贡献零文本不进搜索；merge-extensible 的未知事件、未知块与未知 turn 原因一律返回空串——不会因载荷碰巧含字符串就可搜；todo/write 抽取 status 加 content。
+filters.ts[KB7M]: F:会话与事件文档的纯谓词过滤（子句内 OR、子句间 AND） | R:code:packages/session-query/session-query/src/types.ts | A:引擎读路径与搜索后端 | S:materialize 系列在异步边界前复制并校验调用方子句，防过滤执行前载荷被变异；文本过滤先经 compileSessionTextFilter 编译再执行。
+observation.ts[AD8M]: F:live 与 prepared 一致观测：Disposable 快照、租约与冷缓存 | R:code:packages/session-query/session-query/src/cold-read.ts | A:observeSession、subagent、session-reference | S:events 惰性物化——只读 header、cursor 或 projections 不复制日志；prepared 观测仅当持久 revision 未变时有效；活跃租约不计入 preparedSessionCacheSize 上限；retain 返回可独立 dispose 的租约。
+tracing.ts[KO7M]: F:会话谱系追踪与事件替换关系的一次性分析 | R:code:packages/session-query/session-query/src/documents.ts | A:traceSession 与 traceEvent | S:一次 analyzeEventLog 同时产出记录、replacedBy、被替换分组与当前列表；谱系断链返回第一个不可解析 parent 而非抛错；替换关系来自 canonical fold 的 shadowedSeqs。
+
+===D:/chengzi-pro/dsh-official/packages/subagent/subagent/src/===
+index.ts[AE9L]: F:ctx.subagents 服务：provider 注册表与 start、startContinuable、sendMessage | R:code:packages/subagent/subagent/src/continuation.ts | A:tool-subagent、各 subagent provider、Host | S:continuable 子代理永不产生 SubagentRun 或 Task——manager 直接持有 AgentHandle 经子 inbox 排队；provider 必须在 start 返回前完成子建立（发布即所有权移交唯一边界）；prompt 拒绝隐藏 provider 细节只回稳定码；同进程 provider 是可信协作者，敌意校验只留在真实进程边界。
+types.ts[CE9M]: F:消费面契约：start 请求、结果、能力广告与生命周期事件载荷 | R:code:packages/subagent/subagent/src/index.ts | A:provider 实现与宿主观察者 | S:Capabilities 全 false 代表 out-of-process 后端——需要任一能力的请求在 start 前被拒而非接受后忽略；StopReasonMap 可扩展，未知原因按 failed 加诊断处理；interrupt authority 区分 user（durable 父地址）与 ancestor（须 exact live Agent）。
+child-agent.ts[DE9M]: F:共享子代理组合：深度预算、durable 元数据、选项解析与策略种子 | R:code:packages/subagent/subagent/src/depth.ts | A:spawn-in-process 与 continuation manager | S:深度以持久 header 为单调下限——resume 后父若按 0 计会以顶层身份再委托；provider、model、reasoning 以最新 request/header 为准，创建 options 只是首请求前回退；sandbox、approval、preset 全是机会性 ctx.get，未组合即跳过继承。
+depth.ts[DB9T]: F:委托深度读取与 maxDepth 校验 | R:code:packages/subagent/subagent/src/child-agent.ts | A:child-agent、SubagentRuntime | S:取 Math.max（header.delegationDepth, 运行时值）——运行时 AgentOptions 只能加深不能降低，否则 resume 子代理以顶层身份绕过递归预算；-0 视为非法。
+descriptor.ts[DD9M]: F:durable subagent/descriptor：版本化身份、模式与可续 composition | R:code:packages/subagent/subagent/src/projection.ts | A:provider 建立子代理、cold resume | S:刻意快照显式字段而非整个 AgentOptions——无关扩展值不得让续跑失败；省略 subagentDepth（信任 header 单调下限）与 outputSchema、maxTokens（属单次 activation 预算）；事件 log-only 不入模型历史且 compaction 存活；cold resume 只按 descriptor 重建，不继承父当前预算。
+catalog.ts[PD8S]: F:父所有 subagent/catalog 事件与分块投影 | R:code:packages/subagent/subagent/src/list-children.ts | A:子代理发现 API | S:经 chunked-list 分块追加防单事件过大；目录 v0 只记已知模式，v1 才保留 mode 为 unknown 的子项；目录存于父会话日志——读取走父观测而非子会话。
+projection.ts[KD8S]: F:子代理身份与活跃回合计时的纯投影 | R:code:packages/subagent/subagent/src/descriptor.ts | A:session-query 观测、archive-admission 标签 | S:每遇 descriptor 重置计时状态——fork 种子可能含祖先 descriptor 与已完成回合；descriptor 之前的回合开始暂存 pendingTurnStart 待提升；identity 的 seq 必须过 isOwnSeq 证明来自子自身后缀而非回放的祖先。
+projection-types.ts[CD7T]: F:client-safe 投影词汇：目录行、计时与身份 | R:code:packages/subagent/subagent/src/projection.ts | A:浏览器 client 聚合 | S:CatalogEntry 允许 mode 为 unknown（新版本写入的目录）；timing.active 是开放回合同切点边界；identity 的 seq 是自有后缀证明字段，消费方应复核。
+continuation.ts[AB9L]: F:continuable 编排：稳定 id、descriptor 持久化、冷 resume 与消息路由 | R:code:packages/subagent/subagent/src/continuation-activation.ts | A:SubagentRuntime 的 prompt 与 startContinuable | S:子 inbox 是唯一回合队列，manager 只做 durable 编排；cold resume 要求 exact live parent 授权但只按 descriptor 重建子选项，不继承父当前预算；并发 steer 与 queue 都先过 Activation 锁串行化。
+continuation-activation.ts[AW9L]: F:进程内 Activation 所有权：准入、驻留、串行交付与处置 | R:code:packages/subagent/subagent/src/continuation.ts | A:continuation manager | S:ActivationPool 以 symbol 槽实现本 Activation 与全部 continuable 后代共享容量；ChildLock 串行化每子交付与 teardown；生命周期 abort 必须拦截陈旧 waterfall 回调；handle 处置注销 Agent 后才能发布 terminal 边缘。
+continuation-messages.ts[DM8S]: F:编排侧模型可见消息源：agent-message 与 subagent-settled | R:code:packages/subagent/subagent/src/lifecycle.ts | A:continuation manager 交付与结算 | S:settled 刻意用与 agent-message 不同的 kind——合并会给孩子记上它没说过的话；agent 消息正文带固定前缀 Agent 加 id 加 sent a message；结算摘要受 120 字符截断。
+lifecycle.ts[AM8M]: F:子代理 start 与 end 生命周期边缘发布（两种形态共用） | R:code:packages/subagent/subagent/src/types.ts | A:插件观察者、continuation manager | S:ActivationObserver 的 start、capture、settle 顺序是包内契约而非扩展点；capture 必须赶在 child 仍注册时取终态快照（处置即注销）；驻留前失败不发明生命周期边缘，否则误导消费者。
+assistant-output.ts[KB8T]: F:规范选取子代理最终输出：最后一条非空 assistant 消息 | R:code:packages/subagent/subagent/src/run-settlement.ts | A:run 结算、subagent/end 载荷 | S:空内容消息（max-tokens 步仅记 usage）不得替换早前输出；无任何非空消息时回退拼接流式文本为单个 text 块；选取与 stopReason 无关；fold 也吸收无会话事件传输（如 ACP）pushText 的原始文本。
+archive-admission.ts[AW7T]: F:workspace 归档准入：枚举运行中后代并随父取消 | R:code:packages/subagent/subagent/src/descriptor.ts | A:workspace/session-activity 与 session-stop 监听 | S:后代判定只认持久 lineage（parentSession 加 origin 为 subagent）任意深度；fork 无 origin 不算后代也不扣住源会话；环链以 visited 集合保证访问一次；单个 cancel 失败仅 warn 不阻断其余。
+run-settlement.ts[DW8T]: F:一次性后台 run 结算为 Job outcome | R:code:packages/subagent/subagent/src/assistant-output.ts | A:ctx.jobs 注册 | S:仅 one-shot 后台路径使用 Jobs；aborted 无 diagnostic 映射 killed、带 provider 诊断映射 failed；result 与 dispose 双失败时两个 detail 都保留拼接；仅 text 块参与最终文本。
+out-of-process.ts[IE8M]: F:out-of-process 后端词汇：能力广告、诊断截断、cwd 解析 | R:code:packages/subagent/subagent/src/types.ts | A:subagent-acp 等 wire 驱动 | S:NO_START_CAPABILITIES 全 false——缺能力必须在 start 前拒绝而非接受后忽略；diagnostic 上限 4096 UTF-8 字节且按字符边界回退并加可见截断后缀；子 cwd 取 config override 否则父会话 workspace；结果结算永不 reject。
+inbox.ts[AM8T]: F:Activation 局部准入：queue 与 steer 委派给活 Agent inbox | R:code:packages/subagent/subagent/src/continuation-activation.ts | A:continuation manager 交付路径 | S:closingPromise 置位后 deliver 一律拒收 ACTIVATION_CLOSING；关闭是同步记忆化、释放是共享异步事务；hasPending 同时检查 nextTurn 与 nextStep 两条队列。
+client.ts[CG5T]: F:浏览器安全投影与控制词汇 re-export | R:code:packages/subagent/subagent/src/control-types.ts | A:浏览器 client 聚合 | S:纯 type re-export，禁止携带 Host 运行时值——聚合方只能经此命名空间取类型，防浏览器 bundle 意外拖入 cordis 或 Host 依赖。
+control-types.ts[CM7S]: F:递归目录行与浏览器 prompt、interrupt 请求回执类型 | R:code:packages/subagent/subagent/src/control.ts | A:Host Remote 客户端 | S:PromptRequestId 借用 session-request-id 品牌——session-controller 依赖本包故品牌就地拼写；row 的 activity 为 running 只表观测时驻留不担保投递成功；
+control.ts[IS7S]: F:控制请求 Zod 校验与稳定失败码映射（隐藏 provider 细节） | R:code:packages/subagent/subagent/src/index.ts | A:Typert Remote 面 | S:校验严于生成的品牌编解码（mode 字面 continuable、delivery 枚举）；拒绝时未认证与未授权归并为稳定码，防探测 provider 存在性；signal 取消优先于其它拒绝原因返回。
+error.ts[CR6T]: F:SubagentError：code 路由的 HarnessError 子类 | R:code:packages/llm/llm/src/error.ts | A:subagent 全包 | S:code 是稳定路由契约（如 ACTIVATION_CLOSING、UNAUTHORIZED），跨进程重建丢类身份时靠 code 而非 message 判别，禁止解析 message。
+list-children.ts[ID7S]: F:直接子与递归后代发现：读父目录投影逐支释放观测 | R:code:packages/subagent/subagent/src/catalog.ts | A:SubagentRuntime 发现 API | S:每个目录读取用 using 即用即释再进下一支控内存；缺 sessionQuery 或 subagentCatalog 投影抛稳定码；遍历不加载 Agent——activity 为 running 与否是另一维度信息。
+internal.ts[IE6S]: F:包内集成标记：send_message 符号身份与宿主投递隐藏面 | R:code:packages/subagent/subagent/src/index.ts | A:bundled runtime entry、tool-subagent | S:用 Symbol.for 进程稳定符号而非新增公共方法——不扩大 Service 公共面；标记只加符号属性不改模型可见 schema；HostPromptDeliverer 靠 runtime 强转与符号拼写一致维系跨包契约。
+
+===D:/chengzi-pro/dsh-official/packages/spill/spill/src/===
+index.ts[IB8T]: F:SpillStore 抽象服务定义：saveText 与模型可见定位符 | R:code:packages/spill/spill-local/src/index.ts | A:spill-policy、session-reference | S:刻意最小面——无保留策略、无检索搜索 API；同 context 装第二个实现被 cordis 拒绝；真实存储失败必须 reject，降级决策归调用方（policy 视为 best-effort 保留内联）；存储必须私有且派生名不得等于 suggestedName。
+types.ts[CD7T]: F:spill 词汇：Locator、Owner、Source、Ref 纯类型 | R:code:packages/spill/spill/src/index.ts | A:各 spill 后端与消费者 | S:locator 对模型 opaque 不可解析（本地可为路径、远端可为 URI）；source 描述仅供展示绝非访问控制；
+
+===D:/chengzi-pro/dsh-official/packages/feedback/command-feedback/src/===
+index.ts[AU7S]: F:feedback 斜杠命令与 sessionFeedback Remote 记录 feedback/record | R:code:packages/feedback/command-feedback/src/types.ts | A:UI 命令面板、产品反馈面 | S:append 为 eager 但未 flush——确认语义是已入日志而非已落盘；text 与 category 全空的条目仍会记录（这正是授权日志投递的事实）；
+types.ts[CU6T]: F:反馈分类词汇、feedback/record 事件与 Remote 类型 | R:code:packages/feedback/command-feedback/src/index.ts | A:message-feedback 复用分类、浏览器类型面 | S:7 个分类 id 是 durable 日志词汇不可改名；浏览器插件只许 import types——bundle 不得携带 Host 值；事件 log-only 永不进模型上下文。
+
+===D:/chengzi-pro/dsh-official/packages/feedback/message-feedback/src/===
+index.ts[AD8M]: F:按消息反馈服务：冷日志上的 put、delete、list 与 CAS 版本 | R:code:packages/feedback/command-feedback/src/index.ts | A:Host Remote 客户端、feedback/committed 观察者 | S:冷操作经 persistence 写读校验，不构造 Session 或 Agent；version 是 UUID CAS 令牌冲突即拒；feedback/committed 观察者不得 await 同会话的其它 message-feedback 操作否则死锁；fork 继承的反馈按 sessionId 归父，子列表看不到；maxNoteBytes 是必填部署策略。
+types.ts[CD7S]: F:消息反馈请求、值与失败类型及两个 log-only 事件声明 | R:code:packages/feedback/message-feedback/src/index.ts | A:Remote 客户端生成 | S:put 载荷携带完整 item 并保留原 createdAt；delete 不抹历史——旧评分与备注留存在日志中；version 是仅判等的令牌，每次实质变更更换；note trim 后为空视为缺失。
+
+===D:/chengzi-pro/dsh-official/packages/interaction/commands/src/===
+index.ts[AU9L]: F:插件自有斜杠命令注册表与 command.execute 执行管线 | R:code:packages/interaction/commands/src/types.ts | A:UI 命令面板、command-feedback 等 | S:命令名强制小写蛇形正则；未声明 input.attachments 的命令拒绝附件且合规 composer 提前拒绝；handler 收到的附件已 durable 化但模型可见使用全归 handler；command/run 在进 handler 前落日志并与 admission 响应用 commandId 配对；支持 scope 层每 agent 覆盖。
+types.ts[CM8S]: F:command/run 与 command/done 事件词汇及 commands/change 声明 | R:code:packages/interaction/commands/src/index.ts | A:会话投影、富命令卡消费方 | S:run 的 name 与 args 是 parseCommand 的原切分（含分隔空白）——消费方不得重新解析；recordInput 为 false 时 args 缺省，因权威域事件另有载荷；done 可带 sourceEventSeq 指向更富展示的域事件；两事件 log-only 不进模型表面。
+brand.ts[CG6T]: F:CommandDefinitionId 与 CommandId 品牌出口（无 cordis） | R:code:packages/interaction/commands/src/types.ts | A:注册插件与 client 端 | S:刻意不做模块增强——wire 与 client 程序可在未加载 Host Context merge 时命名品牌；CommandId 由 executor 铸造、实例内单调，配对 run、done、admission 三方。
+
+===D:/chengzi-pro/dsh-official/packages/interaction/permission-presets/src/===
+index.ts[AI8L]: F:权限预设服务：permission 命令、目录 Remote 与投影注册 | R:code:packages/interaction/permission-presets/src/types.ts | A:UI 权限开关、sandbox 与 approval 写通道 | S:preset 事件只记用户意图（log-only），执行始终经 knob 规范 setter——两个 preset bundle 相同时靠该事件区分意图；auto 是实验固定 bundle（danger-full-access 加 ask，stored identity 亦匹配 never 供委托子钉死）；custom 永远不是切换目标也不是事件载荷。
+types.ts[CI7T]: F:权限目录与选择投影及 catalog-changed 事件类型 | R:code:packages/interaction/permission-presets/src/index.ts | A:浏览器 client（经 ./client 命名空间） | S:permissions 投影由三个 whole-value 事件折叠（permission/preset、sandbox/mode、approval/policy）；键缺省表示无权限服务组合，客户端据此隐藏控件；
+client.ts[CG5T]: F:client 命名空间纯 re-export（与 types 同源零复制） | R:code:packages/interaction/permission-presets/src/types.ts | A:浏览器聚合 | S:仓库纪律是硬约束——client 代码只许从 ./client 导入权限类型，本文件是同一内容的强制命名空间投影。
+
+===D:/chengzi-pro/dsh-official/packages/interaction/tool-ask-user/src/===
+index.ts[AU8S]: F:ask_user_question 工具注册（legacy 阻塞或 opt-in timed 模式） | R:code:packages/interaction/tool-ask-user/src/timed.ts | A:dsh-tools 注册表、模型 | S:mode 为 timed 时只注册 timed 变体不再注册阻塞工具；timeout 单位秒，-1 为无限，上限 2147483 秒（换算毫秒不溢出）；推荐选项放首位并加 Recommended 后缀是提示词约定而非协议约束。
+timed.ts[DU8S]: F:timed ask_user_question：限时等待、pending 语义与补答 | R:code:packages/interaction/user-questions/src/index.ts | A:工具执行 | S:超时结果在 result 值内嵌 pendingNotice 文本——投影与 Client 行靠它区分 pending 与 skipped；skipped 是带空 selected 的答案项，pending 表示整批未到且用户仍可经 answer_to_pending_question 消息补答；问题 id 批内必须唯一否则执行期抛错。
+
+===D:/chengzi-pro/dsh-official/packages/interaction/user-approval/src/===
+index.ts[AI9M]: F:ApprovalService：ask 瀑布、审计事件对与会话策略 | R:code:packages/interaction/user-approval/src/types.ts | A:沙箱策略、hook、UI 答复链 | S:无答复者时 fail-closed 到 unavailable；never 策略对每个 ask 确定性 rejected 并带固定模型话术防其要求提权；审计对必须 turn-enclosed——回合间的裸事件重载时会被当 crash 尾静默丢弃；approval/policy 最后一条是会话覆写，source 为 delegation 表示委托种子。
+types.ts[CI7T]: F:审批 id 与结果类型及 asked、decided 事件声明 | R:code:packages/interaction/user-approval/src/index.ts | A:浏览器类型链与答复者 | S:approval/asked 是 log-only 审计而非表面事件（无 surfaceOp）；id 每次请求新铸且 decided 恰好一条；displayReason 是本地化展示通道永不持久化。
+
+===D:/chengzi-pro/dsh-official/packages/interaction/user-questions/src/===
+index.ts[AU9M]: F:UserQuestionService：挂起问题注册、答案瀑布与跨重启恢复 | R:code:packages/interaction/user-questions/src/projection.ts | A:tool-ask-user、UI 答复端 | S:跨进程错误按 name 与 code 重建为 UserQuestionError（丢类身份场景）；answer 的 selected 数组属服务所有，返回模型前必须复制；迟到答案以 user 消息（answer_to_pending_question 识别）补投，不会复活已超时的工具调用。
+projection.ts[KD8M]: F:ask_user_question 事件折叠为可答问题集的投影 | R:code:packages/interaction/user-questions/src/types.ts | A:Host 投影注册、Client 问题行 | S:只跟踪 timed schema 的调用——判定依据是折叠到的 request/header 是否声明 timeout 参数，legacy 阻塞调用永不进入；TOOL_OUTCOME_UNKNOWN 的合成结果不算终结；无变化事件时问题视图复用引用。
+timed-wait.ts[DW8T]: F:前台问题计时器：UI 认领期间暂停倒计时 | R:code:packages/interaction/user-questions/src/index.ts | A:timed ask 流程 | S:计时仅在无认领时走钟，任一 UI attach 即暂停、释放后按剩余时间重排；parent abort 立即关闭；已到期但无人认领时 attach 立即以 timeout 关闭；wait 的 signal 与调用 Turn 的取消是两个生命周期。
+types.ts[CU7S]: F:问题、答案、意图与 pending、settled 投影视图类型 | R:code:packages/interaction/user-questions/src/index.ts | A:UI 答复端与投影消费 | S:intent 是呈现意图标签——不认识的 UI 走通用流且答案编码不变；plan-review 的 approve 指选项名而非位置，禁止按顺序推断结论；state 为 continued 表示答案只能以新回合到达。
