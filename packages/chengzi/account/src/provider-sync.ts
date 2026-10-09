@@ -104,6 +104,20 @@ function chengziGroupCredentialKey(group: string): CredentialKey {
     : credentialKey('llm-pi-ai', chengziGroupProviderRoute(group))
 }
 
+/** 已实测的平台模型部署容量（条目级）。pi-ai 内置模型目录（models.dev 式
+ *  快照）里 deepseek-v4.1-flash 的条目 maxTokens=2000 且条目级优先于一切
+ *  （catalog 解析链 entry→base→route 默认），把专家会话的单轮输出钉死在
+ *  恰好 2000；上游实测 max_tokens=131072 都被接受、上下文 1M 为报错回显
+ *  口径。条目级显式声明即部署选择，压过内置目录（catalog.ts 注释明说
+ *  "Only a value the profile named is a deployment choice"）。未知模型不写
+ *  条目级，保持内置目录能力值与 route 默认兜底。 */
+const MEASURED_MODEL_CAPACITY: Readonly<Record<string, {
+  readonly contextWindow: number
+  readonly maxTokens: number
+}>> = {
+  'deepseek-v4.1-flash': { contextWindow: 1_048_576, maxTokens: 65_536 },
+}
+
 /** Complete provider profile written for the platform route on every sync. */
 export interface ChengziProviderProfile {
   readonly displayName: string
@@ -112,7 +126,12 @@ export interface ChengziProviderProfile {
   readonly apiKeyEnv: string
   readonly defaultContextWindow: number
   readonly defaultMaxTokens: number
-  readonly models: readonly { readonly id: string; readonly name?: string }[]
+  readonly models: readonly {
+    readonly id: string
+    readonly name?: string
+    readonly contextWindow?: number
+    readonly maxTokens?: number
+  }[]
 }
 
 /** 倍率展示格式：<0.1 保留三位、其余两位，去尾零（0.0548→0.055、0.5479→0.55、2.5→2.5）。 */
@@ -184,10 +203,12 @@ export function platformProviderProfile(
     apiKeyEnv: overrides.apiKeyEnv ?? CHENGZI_PLATFORM_API_KEY_ENV,
     defaultContextWindow: 131072,
     defaultMaxTokens: 8192,
-    models: models.map(model => ({
-      id: model.id,
-      name: modelSelectorName(model),
-    })),
+    models: models.map((model) => {
+      const capacity = MEASURED_MODEL_CAPACITY[model.id]
+      return capacity === undefined
+        ? { id: model.id, name: modelSelectorName(model) }
+        : { id: model.id, name: modelSelectorName(model), ...capacity }
+    }),
   }
 }
 

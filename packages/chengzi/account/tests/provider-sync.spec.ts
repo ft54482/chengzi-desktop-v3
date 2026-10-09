@@ -137,6 +137,20 @@ describe('chengzi platform provider sync', () => {
     expect(updates[1]!.patch).toEqual({ provider: 'chengzi-platform', model: PLATFORM_MODEL_IDS[0] })
   })
 
+  it('writes measured entry-level capacity for deepseek-v4.1-flash so the built-in catalog cannot pin output at 2000', async () => {
+    // pi-ai 内置目录的 deepseek-v4.1-flash 条目 maxTokens=2000 且条目级优先于
+    // route 默认——专家会话输出被钉死在恰好 2000。profile 的条目级声明是
+    // 部署选择，必须压过内置目录（catalog.ts: entry.maxTokens ?? base?）。
+    const profile = platformProviderProfile([{ id: 'deepseek-v4.1-flash', displayName: 'DeepSeek V4.1 Flash' }])
+    const entry = profile.models[0]
+    expect(entry?.maxTokens).toBe(65_536)
+    expect(entry?.contextWindow).toBe(1_048_576)
+    // 未知模型不写条目级容量：保持内置目录能力值，route 默认兜底
+    const plain = platformProviderProfile([{ id: 'glm-5.3' }]).models[0]
+    expect(plain?.maxTokens).toBeUndefined()
+    expect(plain?.contextWindow).toBeUndefined()
+  })
+
   it('follows the first free model in the catalog as the default', async () => {
     const { ctx, updates } = createSyncContext()
     await syncPlatformProviderSettings(ctx, [
