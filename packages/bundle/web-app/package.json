@@ -190,7 +190,8 @@
     "dsh-plugin-chengzi-experts": "workspace:*",
     "dsh-plugin-chengzi-brand": "workspace:*",
     "dsh-plugin-chengzi-aoci": "workspace:*",
-    "dsh-plugin-chengzi-hzcfjt": "workspace:*"
+    "dsh-plugin-chengzi-hzcfjt": "workspace:*",
+    "dsh-plugin-chengzi-reader": "workspace:*"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis": "workspace:~",

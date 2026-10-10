@@ -2816,6 +2816,9 @@ importers:
       dsh-plugin-chengzi-image:
         specifier: workspace:*
         version: link:../../chengzi/image
+      dsh-plugin-chengzi-reader:
+        specifier: workspace:*
+        version: link:../../chengzi/reader
       open:
         specifier: ^11.0.0
         version: 11.0.4
@@ -3128,6 +3131,31 @@ importers:
       dsh-plugin-chengzi-account:
         specifier: workspace:*
         version: link:../account
+
+  packages/chengzi/reader:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
 
   packages/client/connection:
     dependencies:

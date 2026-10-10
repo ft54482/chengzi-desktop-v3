@@ -32,6 +32,10 @@
     # 客户五章节模板 + 审定原版固定头部（assets/hzcfjt-head.pptx）；host 面。
     - id: chengzi-hzcfjt
       name: 'dsh-plugin-chengzi-hzcfjt'
+    # reader: 微信公众号文章读取（read_wechat_article）——客户把公众号当
+    # 素材库（PPT/写作引用）；桌面宽带 IP + 真实浏览器头天然过微信反爬。
+    - id: chengzi-reader
+      name: 'dsh-plugin-chengzi-reader'
 
 # ── 橙子PRO v3：平台生态锁定与默认模型兜底（H 追加层） ────────────────────────
 # 以下为按 id 覆盖/预置的顶层 patch 条目（loader 语义：后层覆盖先层、整组
