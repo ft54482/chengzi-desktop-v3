@@ -475,7 +475,7 @@ export async function packageTarget(
   // closure via --from alongside the three default inputs.
   rmSync(buildPaths.packedChengzi, { recursive: true, force: true })
   mkdirSync(buildPaths.packedChengzi, { recursive: true })
-  for (const chengziPackage of ['account', 'brand', 'experts', 'image', 'aoci', 'hzcfjt']) {
+  for (const chengziPackage of ['account', 'brand', 'experts', 'image', 'aoci', 'hzcfjt', 'reader']) {
     await execute([
       '--dir',
       join(REPOSITORY_ROOT, 'packages', 'chengzi', chengziPackage),
