@@ -429,5 +429,23 @@ export function renderDeck(topic: string, pages: readonly ResolvedSlide[]): Buff
       : `<Relationship Id="${image.rId}" Type="${R}/image" Target="../media/${image.file}"/>`
     entries.push({ name: `ppt/slides/_rels/slide${String(slideNo)}.xml.rels`, data: Buffer.from(`<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="${R}/slideLayout" Target="../slideLayouts/slideLayout90.xml"/>${imageRel}</Relationships>`) })
   }
+  // ── 根 .rels 对账：模板头资产声明的关系未必都有部件随包（thumbnail、
+  // custom-properties 在资产精简时被裁掉，writer 也只重写 core/app）。
+  // LibreOffice 的 OPC 读取器对悬空关系直接让 loadComponentFromURL 返回空
+  // （客户端预览的「Office 转换失败」），PowerPoint 则容忍——按实际部件
+  // 集合剥掉悬空声明，外部链接（带 scheme 的 Target）原样保留。 ──
+  const relsIndex = entries.findIndex(entry => entry.name === '_rels/.rels')
+  if (relsIndex >= 0) {
+    const known = new Set(entries.map(entry => entry.name))
+    const relsEntry = entries[relsIndex]
+    if (relsEntry === undefined) throw new Error('internal: _rels/.rels entry vanished during rels reconciliation')
+    const cleaned = relsEntry.data.toString('utf-8').replace(/<Relationship\s[^>]*?\/>/gu, (tag) => {
+      const target = /Target="([^"]*)"/u.exec(tag)?.[1] ?? ''
+      if (/^[a-z][a-z0-9+.-]*:/u.test(target)) return tag
+      const resolved = target.startsWith('/') ? target.slice(1) : target
+      return known.has(resolved) ? tag : ''
+    })
+    entries[relsIndex] = { name: '_rels/.rels', data: Buffer.from(cleaned) }
+  }
   return buildZip(entries)
 }
