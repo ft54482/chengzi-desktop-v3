@@ -352,6 +352,23 @@ describe('generate_image tool', () => {
     }
   })
 
+  it('excludes video-task models that the catalog files under image (MiniMax-H3 incident)', async () => {
+    // 2026-10-10 实案：MiniMax-H3 2K/768P 是视频任务模型，按次计费被目录归入
+    // image 类——确认卡把它当生图档位，Agent 以 ¥1.90/张误调。档位只认
+    // gpt-image-* 命名；image 类里非生图模型一律排除。
+    const ctx = await setup()
+    setCatalog([
+      { id: 'MiniMax-H3 2K', displayName: 'MiniMax-H3 2K', category: 'image', quotaType: 1, inputPriceCny: 1.9 },
+      { id: 'MiniMax-H3 768P', displayName: 'MiniMax-H3 768P', category: 'image', quotaType: 1, inputPriceCny: 1.2 },
+      { id: 'gpt-image-2.5-flare', displayName: 'Flare', category: 'image', quotaType: 1, inputPriceCny: 0.15 },
+    ])
+    try {
+      expect(resolveModelOptions().map(option => option.id)).toEqual(['gpt-image-2.5-flare'])
+    } finally {
+      await ctx.fiber.dispose()
+    }
+  })
+
   it('falls back to the built-in tier list when the catalog has no priced image models', async () => {
     const ctx = await setup()
     setCatalog([{ id: 'glm-5.3', displayName: 'GLM-5.3', category: 'domestic' }])

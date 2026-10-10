@@ -68,11 +68,22 @@ interface CatalogImageModel {
   readonly inputPriceCny?: number
 }
 
+/** 生图模型的目录 id 前缀：image 类里只有它属于静态图生成。MiniMax-H3 系列
+ *  是视频任务模型（按次计费被目录归入 image 类，2026-10-10 实案：确认卡把它
+ *  当生图档位、Agent 以 ¥1.90/张误调）——按前缀排除；平台未来新增生图模型
+ *  沿用 gpt-image-* 命名即自动进档位。 */
+const IMAGE_MODEL_PREFIX = 'gpt-image-'
+
 /** image 类按次计费条目：单价存在且为正的目录行（类型收口，免断言）。 */
 type PricedImageModel = CatalogImageModel & { readonly inputPriceCny: number }
 
 function isPricedImageModel(model: CatalogImageModel): model is PricedImageModel {
   return model.category === 'image' && typeof model.inputPriceCny === 'number' && model.inputPriceCny > 0
+}
+
+/** 目录行是否为静态生图档位：image 类且 id 走 gpt-image-* 命名（排除视频任务模型）。 */
+function isImageGenerationTier(model: PricedImageModel): boolean {
+  return model.id.startsWith(IMAGE_MODEL_PREFIX)
 }
 
 /** 目录驱动的生图档位（2026-10-10 拍板）：平台目录 image 类按次模型即档位——
@@ -81,6 +92,7 @@ function isPricedImageModel(model: CatalogImageModel): model is PricedImageModel
 export function resolveModelOptions(): readonly ModelOption[] {
   const fromCatalog = getCatalogSnapshot()
     .filter(isPricedImageModel)
+    .filter(isImageGenerationTier)
     .map(model => ({
       id: model.id,
       name: model.displayName ?? model.id,
