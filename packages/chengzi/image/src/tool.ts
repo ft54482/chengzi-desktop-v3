@@ -246,11 +246,10 @@ export function defineGenerateImageTool(ctx: Context, config: ChengziImageToolCo
           { label: CONFIRM_LABEL, description: '按所选分辨率生成一张图片并扣费' },
           { label: CANCEL_LABEL, description: '本次不生成、不扣费' },
         ],
-        // Presentation only: a capable UI renders the card as an approve or
-        // decline decision instead of a generic question, and answers with one
-        // of the labels above either way. The approve label MUST name an
-        // option of this question, and `detail` carries the reviewed cost.
-        intent: { kind: 'plan-review', approve: CONFIRM_LABEL, callId: exec.callId },
+        // 不打 plan-review intent（2026-10-11）：该 intent 会让 UI 把卡片渲染成
+        // 「计划待审」并自动向右侧打开计划面板——面板按 callId 在会话历史里找
+        // exit_plan_mode 调用，生图调用永远找不到 → 空白「计划」标签。扣费确认
+        // 走通用问题卡，文案经 question/detail/options 完整保留。
       })
       let answer: { answers: Array<{ id: string; selected: string[] }> }
       try {

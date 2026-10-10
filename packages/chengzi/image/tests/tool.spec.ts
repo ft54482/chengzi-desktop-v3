@@ -216,9 +216,10 @@ describe('generate_image tool', () => {
       // 未指明分辨率：确认卡同时问分辨率与确认，共两问。
       expect(requests).toHaveLength(1)
       expect([...questionIds(requests[0]!)].sort()).toEqual(['confirm', 'resolution'])
-      // 费用确认是 intent 审批式：approve 必须是本问选项之一，并附 detail 供审阅。
+      // 费用确认走通用问题卡（不打 plan-review intent：该 intent 会让 UI 渲染
+      // 「计划待审」并自动打开右侧计划面板，生图调用在历史里找不到计划 → 空白）。
       const confirm = confirmQuestion(requests[0]!)
-      expect(confirm.intent).toMatchObject({ kind: 'plan-review', approve: CONFIRM_LABEL, callId: 'call-1' })
+      expect(confirm.intent).toBeUndefined()
       expect(confirm.detail).toContain('¥0.15')
       expect(result.value).toMatchObject({
         status: 'generated',
