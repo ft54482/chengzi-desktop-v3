@@ -6,7 +6,7 @@ import { Context } from '@deepseek-ai/cordis'
 import AgentRegistry, { type Agent } from '@deepseek-ai/dsh-agent'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
 import ToolRuntime from '@deepseek-ai/dsh-tools'
-import { Session, SessionId, SESSION_FORMAT_VERSION, type Agent as SessionAgent } from '@deepseek-ai/dsh-session'
+import { Session, SessionId, SESSION_FORMAT_VERSION } from '@deepseek-ai/dsh-session'
 import { ToolCallId } from '@deepseek-ai/dsh-llm'
 import { apply, inject, name } from '../src/index.ts'
 import { parseArticle } from '../src/tool.ts'
@@ -16,7 +16,7 @@ let agentSeq = 0
 function agentWith(cwd: string): Agent {
   agentSeq += 1
   const agentId = SessionId(`chengzi-reader-agent-${String(agentSeq)}`)
-  const agent: SessionAgent = {
+  const agent: Agent = {
     id: agentId,
     options: {},
     session: Session.create(agentId, [], {
@@ -29,7 +29,7 @@ function agentWith(cwd: string): Agent {
     status: 'idle',
     ctx: new Context(),
     send() {}, followup() {}, steer() {}, inject() {}, cancel() {},
-    runMaintenance: (task: AbortSignal) => { void task },
+    runMaintenance: task => task(new AbortController().signal),
     whenIdle: () => Promise.resolve(),
   }
   return agent
