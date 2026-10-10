@@ -323,9 +323,32 @@ describe('plan entry points and document', () => {
     render(<PlanTitle {...props as unknown as Parameters<typeof PlanTitle>[0]} />)
     expect(screen.getByText('Plan')).toBeTruthy()
   })
+  it('closes itself once a restored read settles with plan/not-found, and only then', () => {
+    const close = vi.fn()
+    const props = { t,
+      useTabInfo: () => ({ tab: { title: 'Plan', navigation: { address: planAddress(target) }, actions: { close } } }),
+    }
+    const failed = (code: string): unknown => ({ status: 'failed', failure: { code, message: 'diagnostic' } })
+    const view = render(<PlanPreview {...{ ...props, useResource: () => failed('plan/not-found') } as unknown as Parameters<typeof PlanPreview>[0]} />)
+    expect(close).toHaveBeenCalledExactlyOnceWith()
+    // A rerender with the same dead plan must not close twice.
+    view.rerender(<PlanPreview {...{ ...props, useResource: () => failed('plan/not-found') } as unknown as Parameters<typeof PlanPreview>[0]} />)
+    expect(close).toHaveBeenCalledTimes(1)
+    // Transient and diagnostic failures keep the tab open for their message.
+    for (const code of ['plan/read-failed', 'plan/unavailable', 'plan/invalid-address']) {
+      view.rerender(<PlanPreview {...{ ...props, useResource: () => failed(code) } as unknown as Parameters<typeof PlanPreview>[0]} />)
+      expect(close).toHaveBeenCalledTimes(1)
+    }
+    // A temporary review document expires in place instead of closing itself.
+    const temporaryProps = { ...props,
+      useTabInfo: () => ({ tab: { title: 'Plan', navigation: { address: reviewPreviewAddress(target.session.sessionId, 'window:question:1') }, actions: { close } } }),
+    }
+    view.rerender(<PlanPreview {...{ ...temporaryProps, useResource: () => failed('plan/not-found') } as unknown as Parameters<typeof PlanPreview>[0]} />)
+    expect(close).toHaveBeenCalledTimes(1)
+  })
   it.each([en, zh])('localizes plan failures and unavailable providers', (dictionary) => {
     const props = { t: makeTranslate(dictionary, commonEn),
-      useTabInfo: () => ({ tab: { title: 'Plan', navigation: { address: planAddress(target) } } }),
+      useTabInfo: () => ({ tab: { title: 'Plan', navigation: { address: planAddress(target) }, actions: { close: vi.fn() } } }),
     }
     const view = render(<PlanPreview {...{ ...props, useResource: () => ({ status: 'loading' }) } as unknown as Parameters<typeof PlanPreview>[0]} />)
     expect(screen.getByRole('status').textContent).toBe(dictionary['preview.loading'])

@@ -1,5 +1,5 @@
 /** Read-only Markdown viewer for logged plans and temporary review documents. */
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { FileTypeIcon, MarkdownText } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type {} from '@deepseek-ai/dsh-client-ui-sidebar-right/client'
@@ -25,6 +25,20 @@ export function PlanPreview({ useTabInfo, useResource, t }: PlanPreviewProps) {
     code: { copyLabel: t('copy'), copiedLabel: t('copied'), toolbarLabels: { codeLabel: t('codeBlock.title'), wrapLabel: t('codeBlock.wrap'), unwrapLabel: t('codeBlock.unwrap') } },
     footnotes: t('markdown.footnotes'),
   }), [t])
+  // A plan invocation missing from the Session history never comes back, and a
+  // Sidebar layout persists its tabs per Session: a plan tab restored from
+  // storage whose invocation is gone (history pruning, or a tab an over-eager
+  // opener created for a call that was never a plan) would otherwise report
+  // the same failure on every revisit. Close the tab once the read settles
+  // with `plan/not-found`; a transient read failure and an unavailable
+  // history stay visible for diagnosis.
+  const closedRef = useRef(false)
+  useEffect(() => {
+    if (closedRef.current || temporary || resource.status !== 'failed') return
+    if (resource.failure?.code !== 'plan/not-found') return
+    closedRef.current = true
+    tab.tab.actions.close()
+  }, [temporary, resource.status, resource.failure, tab.tab.actions])
   if (plan === undefined) return (
     <div className={css.message} role="status">
       {temporary ? t('preview.expired') : resource.status === 'none' ? t('preview.unavailable')
