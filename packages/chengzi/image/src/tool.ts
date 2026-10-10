@@ -13,6 +13,10 @@
  *  (`ctx.credentials.resolve`), so a re-login reaches the next generation
  *  without a plugin restart. The account plugin stores the key under
  *  {@link CHENGZI_PLATFORM_API_KEY_REF}.
+ *
+ *  生图档位目录驱动：平台 BFF 目录里 category=image 的按次模型即档位（名称与
+ *  单价都是现成字段），账号插件周期刷新目录后本工具在下个执行周期自动跟随
+ *  换模型/调价，无需发客户端版本；目录不可用/为空回落内置兜底清单。
  * @module dsh-plugin-chengzi-image/tool
  */
 
@@ -22,6 +26,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { defineTool, type GenericCallView, type GenericResultView, type ToolDefinition, type ToolResult } from '@deepseek-ai/dsh-tools'
 import { UserQuestionError, type AskUserQuestionItem } from '@deepseek-ai/dsh-user-questions'
+import { getCatalogSnapshot } from 'dsh-plugin-chengzi-account'
 import { generateImages, type ImageRequest } from './image-client.js'
 
 /** Credential reference the platform API key resolves through (`ctx.credentials.resolve`).
@@ -44,9 +49,59 @@ interface ModelOption {
   readonly priceCny: number
 }
 
-const STANDARD_OPTION: ModelOption = { id: 'gpt-image-2', name: '标准', label: '标准（¥0.20/张）', priceCny: 0.2 }
-const FOUR_K_OPTION: ModelOption = { id: 'gpt-image-2-4K', name: '4K 高清', label: '4K 高清（¥0.60/张）', priceCny: 0.6 }
-const MODEL_OPTIONS: readonly ModelOption[] = [STANDARD_OPTION, FOUR_K_OPTION]
+/** 兜底首项：目录异常时的最终落点（也是兜底清单的第一档）。 */
+const FALLBACK_STANDARD: ModelOption = { id: 'gpt-image-2.5-flare', name: 'Flare 标准', label: 'Flare 标准（¥0.15/张）', priceCny: 0.15 }
+
+/** 兜底清单：平台目录不可用/未就绪时使用（与平台现役 image 模型保持一致，随客户端版本更新）。 */
+const FALLBACK_MODEL_OPTIONS: readonly ModelOption[] = [
+  FALLBACK_STANDARD,
+  { id: 'gpt-image-2.5-sunburst', name: 'Sunburst 标准', label: 'Sunburst 标准（¥0.15/张）', priceCny: 0.15 },
+  { id: 'gpt-image-2.5-flare-4k', name: 'Flare 4K', label: 'Flare 4K（¥0.375/张）', priceCny: 0.375 },
+  { id: 'gpt-image-2.5-sunburst-4k', name: 'Sunburst 4K', label: 'Sunburst 4K（¥0.45/张）', priceCny: 0.45 },
+]
+
+/** 目录条目的档位投影面：只声明本工具读取的字段（结构兼容账号插件的目录视图）。 */
+interface CatalogImageModel {
+  readonly id: string
+  readonly displayName?: string
+  readonly category?: string
+  readonly inputPriceCny?: number
+}
+
+/** image 类按次计费条目：单价存在且为正的目录行（类型收口，免断言）。 */
+type PricedImageModel = CatalogImageModel & { readonly inputPriceCny: number }
+
+function isPricedImageModel(model: CatalogImageModel): model is PricedImageModel {
+  return model.category === 'image' && typeof model.inputPriceCny === 'number' && model.inputPriceCny > 0
+}
+
+/** 目录驱动的生图档位（2026-10-10 拍板）：平台目录 image 类按次模型即档位——
+ *  平台换模型/调价，桌面在下个目录刷新周期自动跟随，无需发客户端版本。
+ *  名称后缀 `-4k` 约定为 4K 档；目录不可用/为空回落 {@link FALLBACK_MODEL_OPTIONS}。 */
+export function resolveModelOptions(): readonly ModelOption[] {
+  const fromCatalog = getCatalogSnapshot()
+    .filter(isPricedImageModel)
+    .map(model => ({
+      id: model.id,
+      name: model.displayName ?? model.id,
+      label: `${model.displayName ?? model.id}（¥${String(model.inputPriceCny)}/张）`,
+      priceCny: model.inputPriceCny,
+    }))
+  return fromCatalog.length > 0 ? fromCatalog : FALLBACK_MODEL_OPTIONS
+}
+
+/** 目录为空/异常时档位选取的最终落点：兜底清单首项。 */
+function firstOption(options: readonly ModelOption[]): ModelOption {
+  return options[0] ?? FALLBACK_STANDARD
+}
+
+/** 显式分辨率 → 档位：`-4k` 后缀匹配约定；无匹配回落首项。 */
+function pickOption(resolution: 'standard' | '4k', options: readonly ModelOption[]): ModelOption {
+  if (resolution === '4k') {
+    return options.find(option => option.id.endsWith('-4k')) ?? firstOption(options)
+  }
+  return options.find(option => !option.id.endsWith('-4k')) ?? firstOption(options)
+}
 
 const CANCEL_LABEL = '取消，不生成'
 const CONFIRM_LABEL = '确认生成'
@@ -90,10 +145,6 @@ function readMeta(result: ToolResult): ChengziImageMeta | undefined {
   }
 }
 
-function optionFor(resolution: 'standard' | '4k'): ModelOption {
-  return resolution === '4k' ? FOUR_K_OPTION : STANDARD_OPTION
-}
-
 /**
  * Build the `generate_image` tool definition against the given context.
  * Split from {@link registerGenerateImageTool} so tests can reach the
@@ -105,7 +156,7 @@ function optionFor(resolution: 'standard' | '4k'): ModelOption {
 export function defineGenerateImageTool(ctx: Context, config: ChengziImageToolConfig): ToolDefinition {
   return defineTool({
     name: 'generate_image',
-    description: 'Generate one image from a text prompt with the Chengzi Pro platform image models (GPT-Image-2 / GPT-Image-2 4K). Use it whenever the user asks to create, draw, or 生成 a picture, illustration, poster, slide artwork, or similar. The tool itself raises a confirmation card: it reminds the user about the per-image cost and asks which resolution when you did not state one, so state the intended resolution ("standard" or "4k") when the user already told you. Generation is billed per image to the signed-in account; a cancelled confirmation costs nothing. After a successful generation, call present on the returned file_path so the user actually sees the image, and reference that path if the file should be embedded in further artifacts.',
+    description: 'Generate one image from a text prompt with the Chengzi Pro platform image models (GPT-Image-2.5: flare / sunburst, each in standard and 4K). Use it whenever the user asks to create, draw, or 生成 a picture, illustration, poster, slide artwork, or similar. The tool itself raises a confirmation card: it reminds the user about the per-image cost and asks which resolution when you did not state one, so state the intended resolution ("standard" or "4k") when the user already told you. Generation is billed per image to the signed-in account; a cancelled confirmation costs nothing. After a successful generation, call present on the returned file_path so the user actually sees the image, and reference that path if the file should be embedded in further artifacts.',
     parameters: {
       prompt: {
         type: 'string',
@@ -115,7 +166,7 @@ export function defineGenerateImageTool(ctx: Context, config: ChengziImageToolCo
       resolution: {
         type: 'string',
         enum: ['standard', '4k'],
-        description: 'Either "standard" (GPT-Image-2, ¥0.20 per image) or "4k" (GPT-Image-2 4K, ¥0.60 per image). Optional: when omitted the confirmation card asks the user to choose.',
+        description: 'Either "standard" (gpt-image-2.5-flare, ¥0.15 per image) or "4k" (gpt-image-2.5-flare-4k, ¥0.375 per image); the confirmation card additionally offers the sunburst variants. Optional: when omitted the confirmation card asks the user to choose.',
       },
     },
     output: {
@@ -156,6 +207,7 @@ export function defineGenerateImageTool(ctx: Context, config: ChengziImageToolCo
         throw new Error(`prompt must be 1~${String(MAX_PROMPT_CHARS)} characters.`)
       }
       const resolution = args.resolution
+      const modelOptions = resolveModelOptions()
 
       // 确认卡：意图 + 费用提醒；分辨率未指明时一并询问。
       const questions: AskUserQuestionItem[] = []
@@ -164,19 +216,20 @@ export function defineGenerateImageTool(ctx: Context, config: ChengziImageToolCo
           id: 'resolution',
           question: '选择生图分辨率',
           header: '分辨率',
-          options: MODEL_OPTIONS.map(option => ({
+          options: modelOptions.map(option => ({
             label: option.label,
-            description: option.id === 'gpt-image-2-4K' ? '4K 高清图像生成模型' : '图像生成模型，支持文生图',
+            description: option.id.endsWith('-4k') ? '4K 高清图像生成模型' : '图像生成模型，支持文生图',
           })),
         })
       }
+      const stated = resolution === undefined ? undefined : pickOption(resolution, modelOptions)
       questions.push({
         id: 'confirm',
         question: '生成图片将按张计费并从账户余额扣除，确认生成？',
         header: '生图确认',
-        detail: resolution === undefined
-          ? '生图按张计费：标准 ¥0.20/张，4K 高清 ¥0.60/张；确认后按所选分辨率从账户余额扣除。'
-          : `按${optionFor(resolution).name}生成一张图片，费用 ¥${optionFor(resolution).priceCny.toFixed(2)} 从账户余额扣除。`,
+        detail: stated === undefined
+          ? `生图按张计费：${modelOptions.map(option => `${option.name} ¥${option.priceCny.toFixed(2)}/张`).join('，')}；确认后按所选分辨率从账户余额扣除。`
+          : `按${stated.name}生成一张图片，费用 ¥${stated.priceCny.toFixed(2)} 从账户余额扣除。`,
         options: [
           { label: CONFIRM_LABEL, description: '按所选分辨率生成一张图片并扣费' },
           { label: CANCEL_LABEL, description: '本次不生成、不扣费' },
@@ -208,8 +261,8 @@ export function defineGenerateImageTool(ctx: Context, config: ChengziImageToolCo
         return { status: 'cancelled', note: '用户取消了本次生图，未扣费。' } satisfies GenerateImageResult
       }
       const chosen = resolution !== undefined
-        ? optionFor(resolution)
-        : MODEL_OPTIONS.find(option => byId.get('resolution')?.selected.includes(option.label)) ?? STANDARD_OPTION
+        ? pickOption(resolution, modelOptions)
+        : modelOptions.find(option => byId.get('resolution')?.selected.includes(option.label)) ?? firstOption(modelOptions)
 
       // 会话工作区：图片必须落盘才能 present / 被后续产物引用。
       const cwd = exec.agent === undefined ? undefined : exec.agent.session.header.cwd

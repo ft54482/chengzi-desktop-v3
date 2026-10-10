@@ -62,5 +62,5 @@ export function apply(ctx: Context, config: Config): void {
 /** Credential reference execution resolves the billed platform key through. */
 export { CHENGZI_PLATFORM_API_KEY_REF } from './tool.js'
 export { assertSafePlatformOrigin, ChengziImagePlatformError, generateImages } from './image-client.js'
-export { registerGenerateImageTool } from './tool.js'
+export { registerGenerateImageTool, resolveModelOptions } from './tool.js'
 export type { GenerateImageResult } from './tool.js'

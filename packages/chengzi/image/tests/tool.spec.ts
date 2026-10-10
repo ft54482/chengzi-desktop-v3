@@ -26,10 +26,28 @@ import UserQuestionService, {
 } from '@deepseek-ai/dsh-user-questions'
 
 import { assertSafePlatformOrigin, type ImageRequest } from '../src/image-client.js'
-import { defineGenerateImageTool, registerGenerateImageTool } from '../src/tool.js'
+import { defineGenerateImageTool, registerGenerateImageTool, resolveModelOptions } from '../src/tool.js'
 import { CHENGZI_PLATFORM_API_KEY_REF } from '../src/index.js'
 
+/** 平台目录条目（测试注入的结构面；档位投影只读取其中少数字段）。 */
+type CatalogEntry = Record<string, unknown>
+type CatalogSnapshotFn = () => readonly CatalogEntry[]
+
+/** 平台目录 mock：档位目录驱动用例注入假目录（空目录 = 兜底清单路径）。 */
+const accountMocks = vi.hoisted(() => ({
+  getCatalogSnapshot: vi.fn<CatalogSnapshotFn>(() => []),
+}))
+
+vi.mock('dsh-plugin-chengzi-account', () => ({
+  getCatalogSnapshot: accountMocks.getCatalogSnapshot,
+}))
+
 const CONFIRM_LABEL = '确认生成'
+
+/** Inject one platform catalog for the catalog-driven tier tests. */
+function setCatalog(models: readonly CatalogEntry[]): void {
+  accountMocks.getCatalogSnapshot.mockReturnValue(models)
+}
 
 /** Transport that plays one JSON response and records the request. */
 function fakeTransport(response: { status?: number; body?: unknown } = {}): {
@@ -126,6 +144,8 @@ async function setup(options: {
   answerer?: Answerer
   transport?: ImageRequest
 } = {}): Promise<Context> {
+  accountMocks.getCatalogSnapshot.mockReset()
+  accountMocks.getCatalogSnapshot.mockReturnValue([])
   const ctx = new Context()
   await ctx.plugin(AgentRegistry)
   await ctx.plugin(SystemPrompt)
@@ -176,7 +196,7 @@ describe('generate_image tool', () => {
       answerer: async (request) => {
         requests.push(request)
         return { answers: [
-          { id: 'resolution', selected: ['标准（¥0.20/张）'] },
+          { id: 'resolution', selected: ['Flare 标准（¥0.15/张）'] },
           { id: 'confirm', selected: [CONFIRM_LABEL] },
         ] }
       },
@@ -199,11 +219,11 @@ describe('generate_image tool', () => {
       // 费用确认是 intent 审批式：approve 必须是本问选项之一，并附 detail 供审阅。
       const confirm = confirmQuestion(requests[0]!)
       expect(confirm.intent).toMatchObject({ kind: 'plan-review', approve: CONFIRM_LABEL, callId: 'call-1' })
-      expect(confirm.detail).toContain('¥0.20')
+      expect(confirm.detail).toContain('¥0.15')
       expect(result.value).toMatchObject({
         status: 'generated',
-        model: 'gpt-image-2',
-        price_cny: 0.2,
+        model: 'gpt-image-2.5-flare',
+        price_cny: 0.15,
       })
       const value = result.value as { file_path: string }
       expect(value.file_path).toMatch(/^chengzi-images\/image-\d{8}-\d{6}\.png$/u)
@@ -213,7 +233,7 @@ describe('generate_image tool', () => {
       expect(transport.calls).toHaveLength(1)
       const init = transport.calls[0]?.init
       expect((init?.headers as Record<string, string>).authorization).toBe('Bearer sk-vip')
-      expect(JSON.parse(init?.body as string)).toMatchObject({ model: 'gpt-image-2', prompt: 'a cat' })
+      expect(JSON.parse(init?.body as string)).toMatchObject({ model: 'gpt-image-2.5-flare', prompt: 'a cat' })
     } finally {
       await rm(workspace, { recursive: true, force: true })
       await ctx.fiber.dispose()
@@ -245,13 +265,104 @@ describe('generate_image tool', () => {
       expect(result.isError).toBe(false)
       if (result.isError) return
       expect(questionIds(requests[0]!)).toEqual(['confirm'])
-      expect(confirmQuestion(requests[0]!).detail).toContain('¥0.60')
-      expect(result.value).toMatchObject({ model: 'gpt-image-2-4K', price_cny: 0.6 })
+      expect(confirmQuestion(requests[0]!).detail).toContain('¥0.38')
+      expect(result.value).toMatchObject({ model: 'gpt-image-2.5-flare-4k', price_cny: 0.375 })
       // 平台 key 按次经 credentials.resolve(CHENGZI_PLATFORM_API_KEY_REF) 解析。
-      expect(JSON.parse(transport.calls[0]?.init.body as string)).toMatchObject({ model: 'gpt-image-2-4K' })
+      expect(JSON.parse(transport.calls[0]?.init.body as string)).toMatchObject({ model: 'gpt-image-2.5-flare-4k' })
       expect(resolve).toHaveBeenCalledWith(CHENGZI_PLATFORM_API_KEY_REF)
     } finally {
       await rm(workspace, { recursive: true, force: true })
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('builds image options from the platform catalog (catalog-driven, no client release needed)', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'chengzi-image-'))
+    const transport = fakeTransport()
+    const requests: AskUserQuestionRequest[] = []
+    const ctx = await setup({
+      transport: transport.request,
+      answerer: async (request) => {
+        requests.push(request)
+        return { answers: [
+          { id: 'resolution', selected: ['Aura（¥0.99/张）'] },
+          { id: 'confirm', selected: [CONFIRM_LABEL] },
+        ] }
+      },
+    })
+    // 平台换成 gpt-image-3（只改目录配置）：桌面在下个目录刷新周期自动跟随，无需发版。
+    setCatalog([
+      { id: 'gpt-image-3-aura', displayName: 'Aura', category: 'image', quotaType: 1, inputPriceCny: 0.99 },
+      { id: 'gpt-image-3-aura-4k', displayName: 'Aura 4K', category: 'image', quotaType: 1, inputPriceCny: 2.5 },
+      { id: 'glm-5.3', displayName: 'GLM-5.3', category: 'domestic' },
+    ])
+    try {
+      const agent = agentWithWorkspace(workspace)
+      ctx.agents.enter(agent, undefined)
+      const result = await ctx.tools.execute({
+        signal: new AbortController().signal,
+        callId: ToolCallId('call-12'),
+        name: 'generate_image',
+        arguments: { prompt: 'a cat' },
+        agent,
+      })
+      expect(result.isError).toBe(false)
+      if (result.isError) return
+      expect(result.value).toMatchObject({ status: 'generated', model: 'gpt-image-3-aura', price_cny: 0.99 })
+      expect(JSON.parse(transport.calls[0]?.init.body as string)).toMatchObject({ model: 'gpt-image-3-aura' })
+      // 档位即目录 image 类按次模型：非 image 类与无单价条目不进档位。
+      const request = requests[0]!
+      const labels = (request.questions.find(question => question.id === 'resolution')?.options ?? [])
+        .map(option => option.label)
+      expect(labels).toEqual(['Aura（¥0.99/张）', 'Aura 4K（¥2.5/张）'])
+    } finally {
+      await rm(workspace, { recursive: true, force: true })
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('maps resolution=4k to the catalog entry with the -4k suffix', async () => {
+    const workspace = await mkdtemp(join(tmpdir(), 'chengzi-image-'))
+    const transport = fakeTransport()
+    const ctx = await setup({
+      transport: transport.request,
+      answerer: async () => ({ answers: [{ id: 'confirm', selected: [CONFIRM_LABEL] }] }),
+    })
+    setCatalog([
+      { id: 'gpt-image-3-aura', displayName: 'Aura', category: 'image', quotaType: 1, inputPriceCny: 0.99 },
+      { id: 'gpt-image-3-aura-4k', displayName: 'Aura 4K', category: 'image', quotaType: 1, inputPriceCny: 2.5 },
+    ])
+    try {
+      const agent = agentWithWorkspace(workspace)
+      ctx.agents.enter(agent, undefined)
+      const result = await ctx.tools.execute({
+        signal: new AbortController().signal,
+        callId: ToolCallId('call-13'),
+        name: 'generate_image',
+        arguments: { prompt: 'a cat', resolution: '4k' },
+        agent,
+      })
+      expect(result.isError).toBe(false)
+      if (result.isError) return
+      expect(result.value).toMatchObject({ status: 'generated', model: 'gpt-image-3-aura-4k', price_cny: 2.5 })
+      expect(JSON.parse(transport.calls[0]?.init.body as string)).toMatchObject({ model: 'gpt-image-3-aura-4k' })
+    } finally {
+      await rm(workspace, { recursive: true, force: true })
+      await ctx.fiber.dispose()
+    }
+  })
+
+  it('falls back to the built-in tier list when the catalog has no priced image models', async () => {
+    const ctx = await setup()
+    setCatalog([{ id: 'glm-5.3', displayName: 'GLM-5.3', category: 'domestic' }])
+    try {
+      expect(resolveModelOptions().map(option => option.id)).toEqual([
+        'gpt-image-2.5-flare',
+        'gpt-image-2.5-sunburst',
+        'gpt-image-2.5-flare-4k',
+        'gpt-image-2.5-sunburst-4k',
+      ])
+    } finally {
       await ctx.fiber.dispose()
     }
   })
@@ -476,7 +587,7 @@ describe('generate_image tool', () => {
       const generated = definition.presentResult?.(args, {
         isError: false,
         content: [{ type: 'text', text: 'generated' }],
-        meta: { status: 'generated', filePath: 'chengzi-images/image-1.png', model: 'gpt-image-2', priceCny: 0.2 },
+        meta: { status: 'generated', filePath: 'chengzi-images/image-1.png', model: 'gpt-image-2.5-flare-4k', priceCny: 0.375 },
       })
       expect(generated === undefined ? undefined : generated.title).toContain('chengzi-images/image-1.png')
 

@@ -28,6 +28,9 @@
     },
     {
       "path": "../../interaction/user-questions"
+    },
+    {
+      "path": "../account/tsconfig.host.json"
     }
   ]
 }
